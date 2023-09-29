@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 from pydrake.geometry import MeshcatVisualizer, MeshcatVisualizerParams, Role, StartMeshcat, SceneGraph
-from pydrake.multibody.plant import AddMultibodyPlantSceneGraph, MultibodyPlant
+from pydrake.multibody.plant import MultibodyPlant
 from pydrake.systems.framework import DiagramBuilder, Diagram, LeafSystem, InputPort, OutputPort, BasicVector, Context
 from pydrake.systems.analysis import Simulator
 
 import numpy as np
 
 class Sensing(LeafSystem):
+    # The Sensing class takes the state of the system and computes a sensor output signal
+    # For example, an encoder will return a (potentially noisy) value corresponding to a joint angle
     def __init__(self,n_states,n_outputs):
         super().__init__()
 
@@ -28,6 +30,8 @@ class Sensing(LeafSystem):
         return self.get_sensor_output_port().Eval(context)
 
 class Observer(LeafSystem):
+    # The Observer class takes the raw sensor data and tries to estimate the system state
+    # For example this might take a finite difference on a position signal to estimate a velocity
     def __init__(self,n_sensors,n_est_states):
         super().__init__()
 
@@ -48,6 +52,9 @@ class Observer(LeafSystem):
         return self.get_estimated_state_output_port().Eval(context)
     
 class Controller(LeafSystem):
+    # The Controller class takes the estimated state from the observer and a target value, and computes
+    # an actuation input to the system. For example a PD controller scales the tracking error by a constant
+    # to find an output torque.
     def __init__(self, n_states, n_targets, n_outputs):
         super().__init__()
 
@@ -72,6 +79,7 @@ class Controller(LeafSystem):
         return self.get_actuation_output_port().Eval(context)
     
 class Target(LeafSystem):
+    # The Target class generates the reference signal to be tracked. This might be a fixed value, or might vary with time.
     def __init__(self, n_targets):
         super().__init__()
 
@@ -88,6 +96,9 @@ class Target(LeafSystem):
         return self.get_target_output_port().Eval(context)
     
 class ControlSystem():
+    # The ControlSystem puts all the puzzle pieces together in a Diagram and connexcts their inputs and outputs. 
+    # it also provides a simulator, visualizer, and logger that show the response of the system.
+    # To access the visualization output, open localhost:7000/ in your browser
     def __init__(self,builder: DiagramBuilder, plant: MultibodyPlant, scene_graph: SceneGraph, sensing: Sensing,observer: Observer,controller: Controller,target: Target):
         self.plant:MultibodyPlant = plant
         self.scene_graph:SceneGraph = scene_graph

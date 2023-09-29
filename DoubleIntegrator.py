@@ -41,16 +41,23 @@ class DINaiveObserver(Observer):
     def __init__(self,n_sense=1,n_est_states=2,dt_update:float=1e-3):
         super().__init__(n_sense,n_est_states)
 
+        # Initialize our stored variables and position estimate
         self.prev_pos = 0.
         self.prev_time = -1.e-3
         self.est_state = np.zeros(2)
 
+        # Periodically call UpdateEstimate to recompute the finite difference
         self.DeclarePeriodicUnrestrictedUpdateEvent(dt_update,0.,self.UpdateEstimate)
 
     def UpdateEstimate(self,context:Context,state):
+        # Get the current simlator time
         curr_time = context.get_time()
+        # Read in the sensor signal from the input port, and use this as our position estimate
         self.est_state[0] = self.get_sensor_input_port().Eval(context)
+        # use the previous stored position estimate and time to do a finite difference for velocity
         self.est_state[1] = (self.est_state[0] - self.prev_pos)/(curr_time - self.prev_time)
+
+        # Update the stored position and time
         self.prev_pos = self.est_state[0]
         self.prev_time = curr_time
 
@@ -66,11 +73,10 @@ class DIKalmanObserver(Observer):
         self.DeclarePeriodicUnrestrictedUpdateEvent(dt_update,0.,self.UpdateEstimate)
     
     def UpdateEstimate(self,context:Context,state):
+        # Update the estimated state here
         pass
 
     def CalcObserverOutput(self, context: Context, output: BasicVector):
-        # Compute the observer output here
-
         output.SetFromVector(self.est_state)
 
 class DIController(Controller):
@@ -115,6 +121,7 @@ if __name__ == '__main__':
     # Simulate the control system
     log_data = system.Simulate(np.array([0.,0.]),20,wait=False)
     
+    # Parse the logged data and plot the tracking performance
     time = np.array(log_data['time'])
     true_state = np.array(log_data['plant_data'])
     ref_state = np.array(log_data['target_data'])
