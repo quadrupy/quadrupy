@@ -76,8 +76,8 @@ class DINaiveObserver(Observer):
 
 
 class DIKalmanObserver(Observer):
-    def __init__(self, n_sense=1, n_est_states=2, dt_update: float = 1e-3):
-        super().__init__(n_sense, n_est_states)
+    def __init__(self, n_sense = 1, n_est_states = 2, n_actuators = 1, dt_update: float = 1e-3):
+        super().__init__(n_sense, n_est_states, n_actuators, dt_update)
 
         # Initialize the state estimate, state covariance, and process noise covariance
         self.x_k = np.zeros(n_est_states)
@@ -97,12 +97,15 @@ class DIKalmanObserver(Observer):
         self.DeclarePeriodicUnrestrictedUpdateEvent(dt_update, 0.0, self.UpdateEstimate)
 
     def UpdateEstimate(self, context: Context, state):
+        # Get current sensor reading and previous actuation value
+        z_k = self.get_sensor_input_port().Eval(context)
+        u_k_minus_1 = self.get_actuation_input_port().Eval(context)
+
         # Prediction step: Propagate the state estimate and covariance forward
         x_k_prior = self.F @ self.x_k
         P_k_prior = self.F @ self.P_k @ self.F.T + self.Q_k
 
         # Correction step: Calculate Kalman gain and update the estimate and covariance
-        z_k = self.get_sensor_input_port().Eval(context)
         y_k = z_k - self.H @ x_k_prior
         S_k = self.H @ P_k_prior @ self.H.T + self.R_k
         K_k = P_k_prior @ self.H.T @ np.linalg.inv(S_k)
@@ -118,7 +121,7 @@ class DIKalmanObserver(Observer):
 class DIController(Controller):
     def __init__(
         self,
-        K: np.ndarray = np.array([[100.0, 50.0]]),
+        K: np.ndarray = np.array([[100.0, 20.0]]),
         max_force: np.ndarray = np.array([100.0]),
     ):
         n_states = K.shape[1]

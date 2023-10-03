@@ -4,6 +4,7 @@ from pydrake.geometry import MeshcatVisualizer, MeshcatVisualizerParams, Role, S
 from pydrake.multibody.plant import MultibodyPlant
 from pydrake.systems.framework import DiagramBuilder, Diagram, LeafSystem, InputPort, OutputPort, BasicVector, Context
 from pydrake.systems.analysis import Simulator
+from pydrake.systems.primitives import ZeroOrderHold
 
 import numpy as np
 
@@ -32,15 +33,25 @@ class Sensing(LeafSystem):
 class Observer(LeafSystem):
     # The Observer class takes the raw sensor data and tries to estimate the system state
     # For example this might take a finite difference on a position signal to estimate a velocity
-    def __init__(self,n_sensors,n_est_states):
+    def __init__(self,n_sensors,n_est_states,n_actuators=0,dt_update=None):
         super().__init__()
+        self.n_actuators = n_actuators
+        self.dt_update = dt_update
 
         self.DeclareVectorInputPort('sensor_input', n_sensors)
+        if self.n_actuators > 0:
+            self.DeclareVectorInputPort('actuation_input', n_actuators)
         self.DeclareVectorOutputPort('est_state_output', n_est_states, self.CalcObserverOutput)
     
     def get_sensor_input_port(self) -> InputPort:
         return self.GetInputPort('sensor_input')
 
+    def get_actuation_input_port(self) -> InputPort:
+        if self.n_actuators == 0:
+            return None
+        else:
+            return self.GetInputPort('actuation_input')
+    
     def get_estimated_state_output_port(self) -> OutputPort:
         return self.GetOutputPort('est_state_output')
 
@@ -114,10 +125,20 @@ class ControlSystem():
         builder.AddSystem(controller)
         builder.AddSystem(target)
         builder.Connect(plant.get_state_output_port(), sensing.get_state_input_port())
-        builder.Connect(sensing.get_sensor_output_port(),observer.get_sensor_input_port())
-        builder.Connect(observer.get_estimated_state_output_port(),controller.get_state_input_port())
-        builder.Connect(target.get_target_output_port(),controller.get_target_input_port())
-        builder.Connect(controller.get_actuation_output_port(),plant.get_actuation_input_port())
+        builder.Connect(sensing.get_sensor_output_port(), observer.get_sensor_input_port())
+        if observer.get_actuation_input_port() is not None:
+            # Observer depends on the previous sensor input. Add a zero-order-hold and connect
+            if self.observer.dt_update is None:
+                zoh_dt = self.plant.time_step()
+            else:
+                zoh_dt = self.observer.dt_update
+            self.actuation_hold = ZeroOrderHold(zoh_dt, controller.get_actuation_output_port().size(), 0.0)
+            builder.AddSystem(self.actuation_hold)
+            builder.Connect(controller.get_actuation_output_port(), self.actuation_hold.get_input_port())
+            builder.Connect(self.actuation_hold.get_output_port(), observer.get_actuation_input_port())
+        builder.Connect(observer.get_estimated_state_output_port(), controller.get_state_input_port())
+        builder.Connect(target.get_target_output_port(), controller.get_target_input_port())
+        builder.Connect(controller.get_actuation_output_port(), plant.get_actuation_input_port())
 
         meshcat = StartMeshcat()
         vis_params = MeshcatVisualizerParams(role=Role.kPerception, prefix="visual",publish_period=1/64.)
