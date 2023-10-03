@@ -44,6 +44,39 @@ class DIPositionSensor(Sensing):
 
         output.SetFromVector(self.selection_matrix @ robot_state + noise)
 
+class DIPositionAndAccelerationSensor(Sensing):
+    def __init__(
+        self,
+        position_noise_covariance: np.array = None,
+        acceleration_noise_covariance: np.array = None
+    ):
+        self.selection_matrix = np.array([[1.0, 0.0]])
+        n_states = self.selection_matrix.shape[1]
+        self.n_positions = 1
+        self.n_accels = 1
+        n_outputs = self.n_positions + self.n_accels
+
+        if position_noise_covariance is None:
+            position_noise_covariance = np.zeros([self.n_positions, self.n_positions])
+        self.position_noise_covariance = position_noise_covariance
+
+        if acceleration_noise_covariance is None:
+            acceleration_noise_covariance = np.zeros([self.n_accels, self.n_accels])
+        self.acceleration_noise_covariance = acceleration_noise_covariance
+
+        super().__init__(n_states = n_states, n_accels = self.n_accels, n_outputs = n_outputs)
+
+    def CalcSensorData(self, context: Context, output: BasicVector):
+        robot_state = self.get_state_input_port().Eval(context)
+        robot_acceleration = self.get_accelerations_input_port().Eval(context)
+        position_noise = np.random.multivariate_normal(
+            np.zeros(self.n_positions), self.position_noise_covariance
+        )
+        acceleration_noise = np.random.multivariate_normal(
+            np.zeros(self.n_accels), self.acceleration_noise_covariance
+        )
+
+        output.SetFromVector(np.vstack([self.selection_matrix @ robot_state + position_noise, robot_acceleration + acceleration_noise]))
 
 class DINaiveObserver(Observer):
     def __init__(self, n_sense=1, n_est_states=2, dt_update: float = 1e-3):
@@ -119,6 +152,49 @@ class DIKalmanObserver(Observer):
         output.SetFromVector(np.squeeze(self.x_k))
 
 
+class DIKalmanObserverWithAcceleration(Observer):
+    def __init__(self, n_sense = 2, n_est_states = 2, n_actuators = 0, dt_update: float = 1e-3):
+        super().__init__(n_sense, n_est_states, n_actuators, dt_update)
+
+        # Initialize the state estimate, state covariance, and process noise covariance
+        self.x_k = np.zeros(n_est_states)
+        self.P_k = np.eye(n_est_states)
+        # self.Q_k = np.eye(n_est_states)  # Adjust as needed
+        self.Q_k = np.eye(n_est_states)  # Adjust as needed
+
+        # Measurement noise covariance (adjust as needed)
+        self.R_k = np.array([[0.0001]])
+
+        # State transition matrix (A) for a continuous-time double integrator
+        self.F = np.array([[1.0, dt_update], [0.0, 1.0]])
+
+        # Measurement matrix (C)
+        self.H = np.array([[1.0, 0.0]])
+
+        self.DeclarePeriodicUnrestrictedUpdateEvent(dt_update, 0.0, self.UpdateEstimate)
+
+    def UpdateEstimate(self, context: Context, state):
+        # Get current sensor reading and previous actuation value
+        sensing_k = self.get_sensor_input_port().Eval(context)
+        z_k = sensing_k[0]
+        acceleration_k = sensing_k[1]
+
+        # Prediction step: Propagate the state estimate and covariance forward
+        x_k_prior = self.F @ self.x_k
+        P_k_prior = self.F @ self.P_k @ self.F.T + self.Q_k
+
+        # Correction step: Calculate Kalman gain and update the estimate and covariance
+        y_k = z_k[0] - self.H @ x_k_prior
+        S_k = self.H @ P_k_prior @ self.H.T + self.R_k
+        K_k = P_k_prior @ self.H.T @ np.linalg.inv(S_k)
+
+        self.x_k = x_k_prior + K_k @ y_k
+        self.P_k = P_k_prior - K_k @ self.H @ P_k_prior
+
+    def CalcObserverOutput(self, context: Context, output: BasicVector):
+        # Reshape est_state to match the desired shape (2,)
+        output.SetFromVector(np.squeeze(self.x_k))
+
 class DIController(Controller):
     def __init__(
         self,
@@ -160,30 +236,35 @@ if __name__ == "__main__":
         description="Simulate a double integrator control system"
     )
     parser.add_argument(
-        "-sensor_noise",
-        dest="noise_std",
+        "-pos_sensor_noise",
+        dest="pos_noise_std",
         default=0.0,
         type=float,
-        help="Add sensor noise with given std (0.01 is a good start!)",
+        help="Add position sensor noise with given std (0.01 is a good start!)",
+    )
+    parser.add_argument(
+        "-acc_sensor_noise",
+        dest="acc_noise_std",
+        default=0.0,
+        type=float,
+        help="Add acceleration sensor noise with given std (0.01 is a good start!)",
     )
     args = parser.parse_args()
 
     # Build the plant
     builder, plant, scene_graph = BuildDIPlant()
     # Build the control system
-    noise = sys.argv[0]
     system = ControlSystem(
         builder,
         plant,
         scene_graph,
-        DIPositionSensor(noise_covariance=[[args.noise_std**2]]),
-        # DINaiveObserver(),
-        DIKalmanObserver(),
+        DIPositionAndAccelerationSensor(position_noise_covariance=[[args.pos_noise_std**2]],acceleration_noise_covariance=[[args.acc_noise_std**2]]),
+        DIKalmanObserverWithAcceleration(),
         DIController(),
         DITarget(),
     )
     # Simulate the control system
-    log_data = system.Simulate(np.array([0.0, 0.0]), 20, wait=False)
+    log_data = system.Simulate(np.array([-1., -1.]),20, wait=False)
 
     # Parse the logged data and plot the tracking performance
     time = np.array(log_data["time"])

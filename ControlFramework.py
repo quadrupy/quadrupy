@@ -11,14 +11,23 @@ import numpy as np
 class Sensing(LeafSystem):
     # The Sensing class takes the state of the system and computes a sensor output signal
     # For example, an encoder will return a (potentially noisy) value corresponding to a joint angle
-    def __init__(self,n_states,n_outputs):
+    def __init__(self,n_states,n_outputs,n_accels = 0):
         super().__init__()
+        self.n_accels = n_accels
 
         self.DeclareVectorInputPort('state_input', n_states)
+        if n_accels > 0:
+            self.DeclareVectorInputPort('acceleration_input', n_accels)
         self.DeclareVectorOutputPort('sensor_output', n_outputs, self.CalcSensorData)
 
     def get_state_input_port(self) -> InputPort:
         return self.GetInputPort('state_input')
+
+    def get_accelerations_input_port(self) -> InputPort:
+        if self.n_accels == 0:
+            return None
+        else:
+            return self.GetInputPort('acceleration_input')
 
     def get_sensor_output_port(self) -> OutputPort:
         return self.GetOutputPort('sensor_output')
@@ -33,7 +42,7 @@ class Sensing(LeafSystem):
 class Observer(LeafSystem):
     # The Observer class takes the raw sensor data and tries to estimate the system state
     # For example this might take a finite difference on a position signal to estimate a velocity
-    def __init__(self,n_sensors,n_est_states,n_actuators=0,dt_update=None):
+    def __init__(self,n_sensors,n_est_states,n_actuators = 0,dt_update = None):
         super().__init__()
         self.n_actuators = n_actuators
         self.dt_update = dt_update
@@ -124,18 +133,27 @@ class ControlSystem():
         builder.AddSystem(observer)
         builder.AddSystem(controller)
         builder.AddSystem(target)
+
         builder.Connect(plant.get_state_output_port(), sensing.get_state_input_port())
+        if sensing.get_accelerations_input_port() is not None:
+            acc_zoh_dt = self.plant.time_step()
+            self.acceleration_hold = ZeroOrderHold(acc_zoh_dt, plant.get_generalized_acceleration_output_port().size(), 0.0)
+            builder.AddSystem(self.acceleration_hold)
+            builder.Connect(plant.get_generalized_acceleration_output_port(), self.acceleration_hold.get_input_port())
+            builder.Connect(self.acceleration_hold.get_output_port(), sensing.get_accelerations_input_port())
+
         builder.Connect(sensing.get_sensor_output_port(), observer.get_sensor_input_port())
         if observer.get_actuation_input_port() is not None:
             # Observer depends on the previous sensor input. Add a zero-order-hold and connect
             if self.observer.dt_update is None:
-                zoh_dt = self.plant.time_step()
+                act_zoh_dt = self.plant.time_step()
             else:
-                zoh_dt = self.observer.dt_update
-            self.actuation_hold = ZeroOrderHold(zoh_dt, controller.get_actuation_output_port().size(), 0.0)
+                act_zoh_dt = self.observer.dt_update
+            self.actuation_hold = ZeroOrderHold(act_zoh_dt, controller.get_actuation_output_port().size(), 0.0)
             builder.AddSystem(self.actuation_hold)
             builder.Connect(controller.get_actuation_output_port(), self.actuation_hold.get_input_port())
             builder.Connect(self.actuation_hold.get_output_port(), observer.get_actuation_input_port())
+            
         builder.Connect(observer.get_estimated_state_output_port(), controller.get_state_input_port())
         builder.Connect(target.get_target_output_port(), controller.get_target_input_port())
         builder.Connect(controller.get_actuation_output_port(), plant.get_actuation_input_port())
