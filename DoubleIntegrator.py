@@ -80,47 +80,39 @@ class DIKalmanObserver(Observer):
         super().__init__(n_sense, n_est_states)
 
         # Initialize the state estimate, state covariance, and process noise covariance
-        self.est_state = np.zeros(n_est_states)
-        self.est_covariance = np.eye(n_est_states)
-        self.process_noise_covariance = np.eye(n_est_states)  # Adjust as needed
+        self.x_k = np.zeros(n_est_states)
+        self.P_k = np.eye(n_est_states)
+        # self.Q_k = np.eye(n_est_states)  # Adjust as needed
+        self.Q_k = np.eye(n_est_states)  # Adjust as needed
 
         # Measurement noise covariance (adjust as needed)
-        self.measurement_noise_covariance = np.array([[0.01]])
+        self.R_k = np.array([[0.0001]])
 
         # State transition matrix (A) for a continuous-time double integrator
-        self.A = np.array([[1.0, dt_update], [0.0, 1.0]])
+        self.F = np.array([[1.0, dt_update], [0.0, 1.0]])
 
         # Measurement matrix (C)
-        self.C = np.array([[1.0, 0.0]])
+        self.H = np.array([[1.0, 0.0]])
 
         self.DeclarePeriodicUnrestrictedUpdateEvent(dt_update, 0.0, self.UpdateEstimate)
 
     def UpdateEstimate(self, context: Context, state):
         # Prediction step: Propagate the state estimate and covariance forward
-        est_state_predict = self.A @ self.est_state
-        est_covariance_predict = (
-            self.A @ self.est_covariance @ self.A.T + self.process_noise_covariance
-        )
+        x_k_prior = self.F @ self.x_k
+        P_k_prior = self.F @ self.P_k @ self.F.T + self.Q_k
 
         # Correction step: Calculate Kalman gain and update the estimate and covariance
-        sensor_measurement = self.get_sensor_input_port().Eval(context)
-        innovation = sensor_measurement - self.C @ est_state_predict
-        innovation_covariance = (
-            self.C @ est_covariance_predict @ self.C.T
-            + self.measurement_noise_covariance
-        )
-        kalman_gain = (
-            est_covariance_predict @ self.C.T @ np.linalg.inv(innovation_covariance)
-        )
+        z_k = self.get_sensor_input_port().Eval(context)
+        y_k = z_k - self.H @ x_k_prior
+        S_k = self.H @ P_k_prior @ self.H.T + self.R_k
+        K_k = P_k_prior @ self.H.T @ np.linalg.inv(S_k)
 
-        self.est_state = est_state_predict + kalman_gain @ innovation
-        self.est_covariance = (
-            est_covariance_predict - kalman_gain @ self.C @ est_covariance_predict
-        )
+        self.x_k = x_k_prior + K_k @ y_k
+        self.P_k = P_k_prior - K_k @ self.H @ P_k_prior
 
     def CalcObserverOutput(self, context: Context, output: BasicVector):
         # Reshape est_state to match the desired shape (2,)
-        output.SetFromVector(np.squeeze(self.est_state))
+        output.SetFromVector(np.squeeze(self.x_k))
 
 
 class DIController(Controller):
