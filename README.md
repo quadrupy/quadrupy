@@ -33,6 +33,7 @@ As a side goal, take a look through the code to get a feel for how the system is
 
 #### Example 1.2 (see tag: Example 1_2)
 With the basic filter implemented in Example 1.1, the velocity estimation shows oscillations as well as a notable time lag. 
+
 ![Example 1.1 Velocity](Figures/Example_1_1_velocity.png)
 
 This is because the dynamics we are using in the filter are not the true dynamics! They are missing the contirbution from the actuation torque. The goal for this example is to add the actuation contribution to your filter implementation.
