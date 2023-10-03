@@ -121,7 +121,7 @@ class DIKalmanObserver(Observer):
 class DIController(Controller):
     def __init__(
         self,
-        K: np.ndarray = np.array([[100.0, 20.0]]),
+        K: np.ndarray = np.array([[100.0, 50.0]]),
         max_force: np.ndarray = np.array([100.0]),
     ):
         n_states = K.shape[1]
