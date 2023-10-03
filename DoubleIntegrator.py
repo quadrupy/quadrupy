@@ -77,44 +77,50 @@ class DINaiveObserver(Observer):
 
 class DIKalmanObserver(Observer):
     def __init__(self, n_sense=1, n_est_states=2, dt_update: float = 1e-3):
-        # Initialize the observer here
+        super().__init__(n_sense, n_est_states)
+
+        # Initialize the state estimate, state covariance, and process noise covariance
         self.est_state = np.zeros(n_est_states)
         self.est_covariance = np.eye(n_est_states)
-        self.process_noise_covariance = np.eye(n_est_states)
+        self.process_noise_covariance = np.eye(n_est_states)  # Adjust as needed
 
-        self.measurement_noise_covariance = np.array([[0.001]])
+        # Measurement noise covariance (adjust as needed)
+        self.measurement_noise_covariance = np.array([[0.01]])
 
+        # State transition matrix (A) for a continuous-time double integrator
         self.A = np.array([[1.0, dt_update], [0.0, 1.0]])
+
+        # Measurement matrix (C)
         self.C = np.array([[1.0, 0.0]])
 
-        super().__init__(n_sense, n_est_states)
         self.DeclarePeriodicUnrestrictedUpdateEvent(dt_update, 0.0, self.UpdateEstimate)
 
     def UpdateEstimate(self, context: Context, state):
-        est_state_predict = np.dot(self.A, self.est_state)
+        # Prediction step: Propagate the state estimate and covariance forward
+        est_state_predict = self.A @ self.est_state
         est_covariance_predict = (
-            np.dot(np.dot(self.A, self.est_covariance), self.A.T)
-            + self.process_noise_covariance
+            self.A @ self.est_covariance @ self.A.T + self.process_noise_covariance
         )
 
+        # Correction step: Calculate Kalman gain and update the estimate and covariance
         sensor_measurement = self.get_sensor_input_port().Eval(context)
-        innovation = sensor_measurement - np.dot(self.C, est_state_predict)
+        innovation = sensor_measurement - self.C @ est_state_predict
         innovation_covariance = (
-            np.dot(np.dot(self.C, est_covariance_predict), self.C.T)
+            self.C @ est_covariance_predict @ self.C.T
             + self.measurement_noise_covariance
         )
-        kalman_gain = np.dot(
-            np.dot(est_covariance_predict, self.C.T),
-            np.linalg.inv(innovation_covariance),
+        kalman_gain = (
+            est_covariance_predict @ self.C.T @ np.linalg.inv(innovation_covariance)
         )
 
-        self.est_state = est_state_predict + np.dot(kalman_gain, innovation)
-        self.est_covariance = est_covariance_predict - np.dot(
-            np.dot(kalman_gain, self.C), est_covariance_predict
+        self.est_state = est_state_predict + kalman_gain @ innovation
+        self.est_covariance = (
+            est_covariance_predict - kalman_gain @ self.C @ est_covariance_predict
         )
 
     def CalcObserverOutput(self, context: Context, output: BasicVector):
-        output.SetFromVector(self.est_state)
+        # Reshape est_state to match the desired shape (2,)
+        output.SetFromVector(np.squeeze(self.est_state))
 
 
 class DIController(Controller):
