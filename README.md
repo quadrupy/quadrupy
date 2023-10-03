@@ -31,9 +31,16 @@ Your goal is to implement the class DIKalmanObserver in DoubleIntegrator.py usin
 
 As a side goal, take a look through the code to get a feel for how the system is structured in Drake. In particular, look at the methods and properties of the MultiBodyPlant object created by BuildDIPlant. You can use these to calculate many useful values, including jacobians, gravity and cotiolis forces and relative frame positions. For the double integrator we don't need all of this, but it will be more useful as we move onto more complicated examples.
 
-#### Example 1.2 (see tag: Example 1_2)
+#### Example 1.2 (see tag: Example_1_2)
 With the basic filter implemented in Example 1.1, the velocity estimate shows a notable time lag. This in turn triggers oscillations in the velocity tracking of the system
 
 ![Example 1.1 Velocity](Figures/Example_1_1_velocity.png)
 
 This is because the dynamics we are using in the filter are not the true dynamics! They are missing the contribution from the actuation torque. The goal for this example is to add the actuation contribution to your filter implementation.
+
+#### Example 1.3 (see tag: Example_1_3)
+Adding the actuation input to the model allows us to track the velocity nicely under sensor noise:
+
+![Example 1.2 Velocity](Figures/Example_1_2_velocity.png)
+
+However, our observers don't always have access to the torques applied to the system. If actuation isn't available, a common approach is to use an IMU to measure the accelerations directly. The goal of this example is to update DIKalmanObserverWithAcceleration to include the acceleration measurement from an IMU. Make sure to also include the sensor noise from the IMU in your update!
