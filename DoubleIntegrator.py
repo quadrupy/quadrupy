@@ -90,6 +90,7 @@ class DIKalmanObserver(Observer):
 
         # State transition matrix (A) for a continuous-time double integrator
         self.F = np.array([[1.0, dt_update], [0.0, 1.0]])
+        self.B = np.array([0.0, dt_update])
 
         # Measurement matrix (C)
         self.H = np.array([[1.0, 0.0]])
@@ -102,7 +103,7 @@ class DIKalmanObserver(Observer):
         u_k_minus_1 = self.get_actuation_input_port().Eval(context)
 
         # Prediction step: Propagate the state estimate and covariance forward
-        x_k_prior = self.F @ self.x_k
+        x_k_prior = self.F @ self.x_k + self.B * u_k_minus_1
         P_k_prior = self.F @ self.P_k @ self.F.T + self.Q_k
 
         # Correction step: Calculate Kalman gain and update the estimate and covariance
