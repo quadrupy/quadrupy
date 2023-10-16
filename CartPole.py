@@ -134,14 +134,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "-pos_sensor_noise",
         dest="pos_noise_std",
-        default=0.0,
+        default=0.01,
         type=float,
         help="Add position sensor noise with given std (0.01 is a good start!)",
     )
     parser.add_argument(
         "-acc_sensor_noise",
         dest="acc_noise_std",
-        default=0.0,
+        default=0.01,
         type=float,
         help="Add acceleration sensor noise with given std (0.01 is a good start!)",
     )
