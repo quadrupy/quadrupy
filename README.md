@@ -44,3 +44,21 @@ Adding the actuation input to the model allows us to track the velocity nicely u
 ![Example 1.2 Velocity](Figures/Example_1_2_velocity.png)
 
 However, our observers don't always have access to the torques applied to the system. If actuation isn't available, a common approach is to use an IMU to measure the accelerations directly. The goal of this example is to update DIKalmanObserverWithAcceleration to include the acceleration measurement from an IMU. Make sure to also include the sensor noise from the IMU in your update!
+
+### Example 2: Cartpole
+
+Our second example is a [cartpole system](http://underactuated.mit.edu/acrobot.html#cart_pole).
+
+![Cartpole diagram](http://underactuated.mit.edu/figures/cartpole.svg)
+
+In our example (CartPole.py), we have set up the system with a position sensor on the pole and an accelerometer on the cart. To control the system, we use a linearization of the system around the [0,pi] position (pole pointed up) to derive a [linear quadratic regulator](http://underactuated.mit.edu/lqr.html) feedback controller. To see the behavior of the controller under perfect state estimation, run:
+```
+python CartPole.py -cheater_observer True
+```
+
+##### Example 2.1 (see branch: Example_2_1)
+
+For this example, we now need to use the position sensor and accelerometer to estimate the 2 positions and velocities of the cartpole system. Your goal is to update CPKalmanObserver to build a Kalman observer linearized around the operating point of the system ([0,pi]). For an example of how to linearize the system, look at CPLQRController. If you are succesful, you should be able to run:
+```
+python CartPole.py
+```
