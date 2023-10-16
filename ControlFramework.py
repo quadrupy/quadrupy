@@ -39,6 +39,17 @@ class Sensing(LeafSystem):
     def LogData(self,context:Context):
         return self.get_sensor_output_port().Eval(context)
 
+class FullStateSensing(Sensing):
+    def __init__(self,n_states):
+        n_outputs = n_states
+        n_accels = 0
+        super().__init__(n_states,n_outputs,n_accels)
+
+    def CalcSensorData(self, context: Context, output: BasicVector):
+        robot_state = self.get_state_input_port().Eval(context)
+        output.SetFromVector(robot_state)
+        return
+
 class Observer(LeafSystem):
     # The Observer class takes the raw sensor data and tries to estimate the system state
     # For example this might take a finite difference on a position signal to estimate a velocity
@@ -71,6 +82,19 @@ class Observer(LeafSystem):
     def LogData(self,context:Context):
         return self.get_estimated_state_output_port().Eval(context)
     
+class FullStateObserver(Observer):
+    def __init__(self,n_states):
+        n_sensors = n_states
+        n_est_states = n_states
+        n_actuators = 0
+        dt_update = None
+        super().__init__(n_sensors,n_est_states,n_actuators,dt_update)
+
+    def CalcObserverOutput(self, context: Context, output: BasicVector):
+        sensor_state = self.get_sensor_input_port().Eval(context)
+        output.SetFromVector(sensor_state)
+        return
+
 class Controller(LeafSystem):
     # The Controller class takes the estimated state from the observer and a target value, and computes
     # an actuation input to the system. For example a PD controller scales the tracking error by a constant
@@ -119,21 +143,33 @@ class ControlSystem():
     # The ControlSystem puts all the puzzle pieces together in a Diagram and connexcts their inputs and outputs. 
     # it also provides a simulator, visualizer, and logger that show the response of the system.
     # To access the visualization output, open localhost:7000/ in your browser
-    def __init__(self,builder: DiagramBuilder, plant: MultibodyPlant, scene_graph: SceneGraph, sensing: Sensing,observer: Observer,controller: Controller,target: Target):
+    def __init__(self,
+                 builder: DiagramBuilder, 
+                 plant: MultibodyPlant, 
+                 scene_graph: SceneGraph, 
+                 sensing: Sensing,
+                 observer: Observer,
+                 controller: Controller,
+                 target: Target):
         self.plant:MultibodyPlant = plant
         self.scene_graph:SceneGraph = scene_graph
+        if sensing is None:
+            # Use full state feedback if no sensing is provided
+            sensing = FullStateSensing(plant.num_multibody_states())
+            observer = FullStateObserver(plant.num_multibody_states())
         self.sensing:Sensing = sensing
         self.observer:Observer  = observer
         self.controller:Controller = controller
         self.target:Target = target
         self.log_buffer = {'time':[],'plant_data':[],'sensing_data':[],'observer_data':[],'controller_data':[],'target_data':[]}
-        
-        # Add the componenets to the builder and connect everything
+
+        # Add the components to the builder
         builder.AddSystem(sensing)
         builder.AddSystem(observer)
         builder.AddSystem(controller)
         builder.AddSystem(target)
 
+        # Connect the input ports and output ports
         builder.Connect(plant.get_state_output_port(), sensing.get_state_input_port())
         if sensing.get_accelerations_input_port() is not None:
             acc_zoh_dt = self.plant.time_step()
