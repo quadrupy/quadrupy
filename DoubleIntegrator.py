@@ -153,22 +153,30 @@ class DIKalmanObserver(Observer):
 
 
 class DIKalmanObserverWithAcceleration(Observer):
-    def __init__(self, n_sense = 2, n_est_states = 2, n_actuators = 0, dt_update: float = 1e-3):
+    def __init__(self, 
+                 n_sense = 2, 
+                 n_est_states = 2, 
+                 n_actuators = 0, 
+                 dt_update: float = 1e-3,
+                 position_noise_covariance: float = [[1e-4]],
+                 acceleration_noise_covariance: float  = [[1e-4]]):
         super().__init__(n_sense, n_est_states, n_actuators, dt_update)
 
         # Initialize the state estimate, state covariance, and process noise covariance
         self.x_k = np.zeros(n_est_states)
         self.P_k = np.eye(n_est_states)
-        # self.Q_k = np.eye(n_est_states)  # Adjust as needed
-        self.Q_k = np.eye(n_est_states)  # Adjust as needed
+        self.Q_k = np.array([[0.0, 0.0], [0.0, dt_update**2*acceleration_noise_covariance[0][0]]])
 
         # Measurement noise covariance (adjust as needed)
-        self.R_k = np.array([[0.0001]])
+        self.R_k = position_noise_covariance
 
         # State transition matrix (A) for a continuous-time double integrator
-        self.F = np.array([[1.0, dt_update], [0.0, 1.0]])
+        self.A = np.array([[1.0, dt_update], [0.0, 1.0]])
+        
+        # Input matrix for acceleration input
+        self.B = np.array([[0.0], [dt_update]])
 
-        # Measurement matrix (C)
+        # Measurement matrix
         self.H = np.array([[1.0, 0.0]])
 
         self.DeclarePeriodicUnrestrictedUpdateEvent(dt_update, 0.0, self.UpdateEstimate)
@@ -176,19 +184,16 @@ class DIKalmanObserverWithAcceleration(Observer):
     def UpdateEstimate(self, context: Context, state):
         # Get current sensor reading and previous actuation value
         sensing_k = self.get_sensor_input_port().Eval(context)
-        z_k = sensing_k[0]
-        acceleration_k = sensing_k[1]
+        z_k = [sensing_k[0]]
+        acceleration_k = [sensing_k[1]]
 
         # Prediction step: Propagate the state estimate and covariance forward
-        x_k_prior = self.F @ self.x_k
-        P_k_prior = self.F @ self.P_k @ self.F.T + self.Q_k
+        x_k_prior = self.A @ self.x_k + self.B @ acceleration_k
+        P_k_prior = self.A @ self.P_k @ self.A.T + self.Q_k
 
         # Correction step: Calculate Kalman gain and update the estimate and covariance
-        y_k = z_k[0] - self.H @ x_k_prior
-        S_k = self.H @ P_k_prior @ self.H.T + self.R_k
-        K_k = P_k_prior @ self.H.T @ np.linalg.inv(S_k)
-
-        self.x_k = x_k_prior + K_k @ y_k
+        K_k = P_k_prior @ self.H.T @ np.linalg.inv(self.H @ P_k_prior @ self.H.T + self.R_k)
+        self.x_k = x_k_prior + K_k @ (z_k - self.H @ x_k_prior)
         self.P_k = P_k_prior - K_k @ self.H @ P_k_prior
 
     def CalcObserverOutput(self, context: Context, output: BasicVector):
@@ -238,14 +243,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "-pos_sensor_noise",
         dest="pos_noise_std",
-        default=0.0,
+        default=0.01,
         type=float,
         help="Add position sensor noise with given std (0.01 is a good start!)",
     )
     parser.add_argument(
         "-acc_sensor_noise",
         dest="acc_noise_std",
-        default=0.0,
+        default=0.01,
         type=float,
         help="Add acceleration sensor noise with given std (0.01 is a good start!)",
     )
@@ -259,7 +264,7 @@ if __name__ == "__main__":
         plant,
         scene_graph,
         DIPositionAndAccelerationSensor(position_noise_covariance=[[args.pos_noise_std**2]],acceleration_noise_covariance=[[args.acc_noise_std**2]]),
-        DIKalmanObserverWithAcceleration(),
+        DIKalmanObserverWithAcceleration(position_noise_covariance=[[args.pos_noise_std**2]],acceleration_noise_covariance=[[args.acc_noise_std**2]]),
         DIController(),
         DITarget(),
     )
