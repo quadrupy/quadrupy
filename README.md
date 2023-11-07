@@ -45,6 +45,8 @@ Adding the actuation input to the model allows us to track the velocity nicely u
 
 However, our observers don't always have access to the torques applied to the system. If actuation isn't available, a common approach is to use an IMU to measure the accelerations directly. The goal of this example is to update DIKalmanObserverWithAcceleration to include the acceleration measurement from an IMU. Make sure to also include the sensor noise from the IMU in your update!
 
+Hint: See Example_1_3_Derivation.pdf for the trick needed to include acceleration measurements.
+
 ### Example 2: Cartpole
 
 Our second example is a [cartpole system](http://underactuated.mit.edu/acrobot.html#cart_pole).
