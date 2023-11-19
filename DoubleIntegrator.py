@@ -168,7 +168,7 @@ class DIKalmanObserverWithAcceleration(Observer):
         self.Q_k = np.array([[0.0, 0.0], [0.0, dt_update**2*acceleration_noise_covariance[0][0]]])
 
         # Measurement noise covariance (adjust as needed)
-        self.R_k = position_noise_covariance
+        self.R_k = dt_update**2*position_noise_covariance
 
         # State transition matrix (A) for a continuous-time double integrator
         self.A = np.array([[1.0, dt_update], [0.0, 1.0]])
