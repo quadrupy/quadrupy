@@ -64,3 +64,13 @@ For this example, we now need to use the position sensor and accelerometer to es
 ```
 python CartPole.py
 ```
+
+##### Example 2.2
+
+After succesfully implementing the example from 2.1, we notice that the pole position and velocity converge nicely to 0, but the cart position and velocity do not:
+
+![Example 2.1 Cart Position](Figures/Example_2_1_cart_position.png)
+
+Notice that the estimated position and velocity are driven to 0, but the actual position drifts to inifinity!
+
+This is due to a fundamental limitation of our plant and sensor setup, namely that the cart position and cart velocity are not [observable states](https://en.wikipedia.org/wiki/Observability). A good exercise here is to use the definition of observability from the linked wikipedia page to derive the unobservable subspace for the linearized cartpole dynamics with IMU observer, and to show that this corresponds to the position and velocity of the cart. 
