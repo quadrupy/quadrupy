@@ -85,6 +85,11 @@ The sensing on board is a traditional IMU setup, consisting of a body-frame meas
 
 The controller for this example is an LQR controller that drives rotation error and position error to 0. The gains for this LQR controller are based on a linearization around the upright hovering position. The form of the state feedback is slightly more complicated than our previous examples. The key difference is that we need to compute a difference in spatial rotations to determine the position error. The way we do this is to convert the target and actual positions to rotation matrices, use a matrix inverse and multiply to compute the difference in rotation, then convert this difference to angle axis representation. The result is a controller that converges globally (provided the state feedback is accurate).
 
+To run example 3 with a cheater observer, call 
+```
+python Quadrotor.py -cheater_observer True
+```
+
 ##### Example 3.1 (see branch: Example_3_1)
 
 Your goal in example 3.1 is to implement an observer that can estimate the full robot state [q_w, q_x, q_y, q_z, x, y, z, wx, wy, wz, vx, vy, vz] based on the measurements from the IMU. To do this, you will first implement an IEKF which linearizes about the current state estimate. 
