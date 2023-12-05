@@ -247,8 +247,8 @@ if __name__ == '__main__':
     plant: QuadrotorSystem
     dt = 1e-3
     builder, plant, scene_graph = BuildQuadrotorPlant(dt)
-    q_init = RollPitchYaw(np.pi,0.,0.).ToQuaternion().wxyz()
-    x_init = np.hstack([q_init,[1.,1.,-1.,0.,0.,0.,0.,0.,0.]])
+    q_init = RollPitchYaw(np.random.rand(3)*2*np.pi).ToQuaternion().wxyz()
+    x_init = np.hstack([q_init,np.random.rand(9)*10-5])
 
     # Compute linearization for LQR
     u_0 = np.ones(4)*9.81*plant.body_plant.CalcTotalMass(plant.body_plant.CreateDefaultContext())/4
