@@ -98,7 +98,7 @@ The dynamics you will use for this observer are an abstraction of the true syste
 
 ![Example 3.1 IEKF Dynamics](Figures/Example_3_1_iekf_dynamics.png)
 
-Here the state is in world frame coordinates and the inputs (aside from g) are in body frame (as measured). R is the rotation matrix produced by the estimated quadrotor roll pitch and yaw (you will keep this constant in the linearization). 
+Here the state is in world frame coordinates and the inputs (aside from g) are in body frame (as measured). R is the rotation matrix produced by the estimated quadrotor roll pitch and yaw (you will treat this as a constant when linearizing the dynamics). 
 
 ##### Example 3.2
 
