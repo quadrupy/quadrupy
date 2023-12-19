@@ -92,14 +92,14 @@ python Quadrotor.py -cheater_observer True
 
 ##### Example 3.1 (see branch: Example_3_1)
 
-Your goal in example 3.1 is to implement an observer that can estimate the full robot state [q_w, q_x, q_y, q_z, x, y, z, wx, wy, wz, vx, vy, vz] based on the measurements from the IMU. To do this, you will first implement an IEKF which linearizes about the current state estimate. 
+Your goal in example 3.1 is to implement an observer that can estimate the full robot state [q_w, q_x, q_y, q_z, x, y, z, wx, wy, wz, vx, vy, vz] based on the measurements from the IMU. To do this, you will first implement an EKF which linearizes about the current state estimate. 
 
 The dynamics you will use for this observer are an abstraction of the true system dynamics, since we don't have measurements of the rotor forces. They are given as follows:
 
-![Example 3.1 IEKF Dynamics](Figures/Example_3_1_iekf_dynamics.png)
+![Example 3.1 EKF Dynamics](Figures/Example_3_1_iekf_dynamics.png)
 
 Here the state is in world frame coordinates and the inputs (aside from g) are in body frame (as measured). R is the rotation matrix produced by the estimated quadrotor roll pitch and yaw (you will treat this as a constant when linearizing the dynamics). 
 
 ##### Example 3.2
 
-Once you have the IEKF working from the previous example, try to initialize the estimate with a value that is far from the true value and see how that affects system stability. The problems this causes is what motivates our use of an InEKF. The goal in this example is to implement the InEKF as described in [this paper](https://www.annualreviews.org/doi/full/10.1146/annurev-control-060117-105010)
+Once you have the EKF working from the previous example, try to initialize the estimate with a value that is far from the true value and see how that affects system stability. The problems this causes is what motivates our use of an InEKF. The goal in this example is to implement the InEKF as described in [this paper](https://www.annualreviews.org/doi/full/10.1146/annurev-control-060117-105010)
