@@ -83,13 +83,18 @@ python Quadrotor.py -cheater_observer True
 
 ##### Example 3.1 (see branch: Example_3_1)
 
-Your goal in example 3.1 is to implement an observer that can estimate the full robot state [q_w, q_x, q_y, q_z, x, y, z, wx, wy, wz, vx, vy, vz] based on the measurements from the IMU. To do this, you will first implement an IEKF which linearizes about the current state estimate. 
+Your goal in example 3.1 is to implement an observer that can estimate the full robot state [q_w, q_x, q_y, q_z, x, y, z, wx, wy, wz, vx, vy, vz] based on the measurements from the IMU. To do this, you will first implement an EKF which linearizes about the current state estimate. 
 
 The dynamics you will use for this observer are an abstraction of the true system dynamics, since we don't have measurements of the rotor forces. They are given as follows:
 
-![Example 3.1 IEKF Dynamics](figures/Example_3_1_iekf_dynamics.png)
+![Example 3.1 EKF Dynamics](figures/Example_3_1_ekf_dynamics.png)
 
-Here the state is in world frame coordinates and the inputs (aside from g) are in body frame (as measured). R is the rotation matrix produced by the estimated quadrotor roll pitch and yaw (you will keep this constant in the linearization). 
+Here g = -9.81m/s^2, the state is in world frame coordinates and the inputs (aside from g) are in body frame (as measured). R is the rotation matrix produced by the estimated quadrotor roll pitch and yaw (you will keep this constant in the linearization). See the Euler angles section in [this link](https://en.wikipedia.org/wiki/Rotation_matrix#General_3D_rotations) for details 
+
+The measurement you will use is the estimated gravity vector (neglecting the effects of body acceleration). The model for this measurement is given by:
+
+![Example 3.1 Sensor Model](figures/Example_3_1_sensor_model.png)
+
 
 ##### Example 3.2
 
