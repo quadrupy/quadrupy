@@ -216,8 +216,11 @@ class ControlSystem():
 
         self.visualizer.StartRecording()
 
-        self.simulator.AdvanceTo(sim_time)
-
+        try:
+            self.simulator.AdvanceTo(sim_time)
+        except:
+            pass
+        
         self.visualizer.StopRecording()
         self.visualizer.PublishRecording()
 

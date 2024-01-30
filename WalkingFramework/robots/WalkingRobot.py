@@ -1,7 +1,7 @@
 from pydrake.systems.framework import LeafSystem, Context, EventStatus, DiagramBuilder, BasicVector
 from pydrake.multibody.plant import MultibodyPlant, AddMultibodyPlantSceneGraph
 from pydrake.common.value import AbstractValue
-from pydrake.multibody.tree import BodyFrame, Body
+from pydrake.multibody.tree import BodyFrame, Body, JointIndex
 from pydrake.systems.analysis import Simulator
 from pydrake.geometry import GeometryId, SceneGraph, Meshcat, MeshcatVisualizer, Role, MeshcatVisualizerParams
 from pydrake.math import RotationMatrix
@@ -181,7 +181,7 @@ class WalkingRobot(LeafSystem):
 
     def HardwareUpdate(self):
         # Send actuation commands to the robot and receive sensing data
-        return
+        raise NotImplementedError
     
     def CalcSensing(self,context: Context,output: AbstractValue):
         output.set_value(self.sensing_data)
@@ -189,3 +189,22 @@ class WalkingRobot(LeafSystem):
     def CalcCheaterState(self,context: Context,output: BasicVector):
         output.set_value(self.cheater_state)
 
+    def GetDependentJoints(self,frame:BodyFrame):
+        # Calculate the joint indices for the joints that are dependent on the given frame
+        # This is useful for calculating the joint indices for the legs
+        joint_indices = []
+        for i in range(self.plant.num_joints()):
+            joint = self.plant.get_joint(JointIndex(i))
+            if joint.num_velocities() == 0:
+                continue
+            joint_bodies = self.plant.GetBodiesKinematicallyAffectedBy([JointIndex(i)])
+            for j in joint_bodies:
+                if self.plant.get_body(j).body_frame().index() == frame.index():
+                    joint_indices.append(i)
+                    break
+        return joint_indices
+
+    def CalcFootIK(self,foot_idx:int,foot_pos_robot_frame:np.array,foot_rot:RotationMatrix=RotationMatrix())->np.array:
+        # Calculate the joint positions for the given foot position and rotation
+        # This is useful for calculating the joint positions for the legs
+        raise NotImplementedError

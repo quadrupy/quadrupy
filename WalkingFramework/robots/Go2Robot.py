@@ -1,7 +1,8 @@
+from numpy.core.multiarray import array as array
 from pydrake.multibody.parsing import Parser
 from pydrake.multibody.plant import AddMultibodyPlantSceneGraph, MultibodyPlant, CoulombFriction
 from pydrake.systems.framework import DiagramBuilder
-from pydrake.math import RigidTransform
+from pydrake.math import RigidTransform, RotationMatrix
 from pydrake.geometry import HalfSpace, Box
 
 import numpy as np
@@ -73,11 +74,47 @@ class Go2Robot(WalkingRobot):
                     (plant.GetFrameByName("FR_foot"),np.zeros([1,3]),plant.GetCollisionGeometriesForBody(plant.GetBodyByName("FR_foot"))),
                     (plant.GetFrameByName("RL_foot"),np.zeros([1,3]),plant.GetCollisionGeometriesForBody(plant.GetBodyByName("RL_foot"))),
                     (plant.GetFrameByName("RR_foot"),np.zeros([1,3]),plant.GetCollisionGeometriesForBody(plant.GetBodyByName("RR_foot")))]
-
+        
         WalkingRobot.__init__(self,builder,plant,scene_graph,imu_body,contacts,actuation_limits,dt=self.settings.controller_dt,is_sim=is_sim)
-
+        
+        # Useful variables for IK
+        self.foot_names = ['FL','FR','RL','RR']
+        self.shoulder_positions = np.array([[sign[0]*0.1934, sign[1]*0.0465, 0.] for sign in [[1,-1],[1,1],[-1,-1],[-1,1]]]) # note left is negative y
+        
     def HardwareUpdate(self):
-        pass
+        raise NotImplementedError
+    
+    def CalcFootIK(self, foot_idx: int, foot_pos_robot_frame: np.array, foot_rot: RotationMatrix = None):
+        lH = 0.095
+        lT = 0.213 # length of both thigh and shank
+        
+        footPos = foot_pos_robot_frame - self.shoulder_positions[foot_idx]
+        # footPos = [xF,yF,zF]
+        # xF is forward/backward coordinate from shoulder
+        # yF is side-to-side coordinate from shoulder
+        # zF is vertical coordinate from shoulder
+        # Start with hip angle
+        xF = np.clip(footPos[0],-1.,1.)
+        yF = np.clip(footPos[1],-1.,1.)
+        zF = np.clip(footPos[2],-1.,0.)
+        mirror = False
+        if (self.foot_names[foot_idx] == 'FR') or (self.foot_names[foot_idx] == 'RR'):
+            mirror = True
+            yF *= -1
+        yF += lH # Shift yF to put our coordinate frame at the leg root
+
+        q_hip = -np.arcsin((-np.sqrt(np.clip(yF**2 + zF**2 - lH**2,0.,np.inf))*yF - lH*zF)/(yF**2 + zF**2))
+        y_hip = lH*(np.cos(q_hip))
+        z_hip = lH*np.sin(q_hip)
+        l_leg = np.clip(np.sqrt(xF**2 + (yF - y_hip)**2 + (zF - z_hip)**2),0.,2*lT)
+        q_knee = -2*np.arccos(l_leg/(2*lT))
+        q_thigh = np.arcsin(-xF/l_leg) - q_knee/2
+
+        if mirror:
+            q_hip *= -1
+
+        return np.array([q_hip,q_thigh,q_knee])
+
 
 
     
