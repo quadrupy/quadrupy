@@ -150,7 +150,8 @@ class ControlSystem():
                  sensing: Sensing,
                  observer: Observer,
                  controller: Controller,
-                 target: Target):
+                 target: Target,
+                 cheater=False):
         self.plant:MultibodyPlant = plant
         self.scene_graph:SceneGraph = scene_graph
         if sensing is None:
@@ -190,7 +191,10 @@ class ControlSystem():
             builder.Connect(controller.get_actuation_output_port(), self.actuation_hold.get_input_port())
             builder.Connect(self.actuation_hold.get_output_port(), observer.get_actuation_input_port())
             
-        builder.Connect(observer.get_estimated_state_output_port(), controller.get_state_input_port())
+        if cheater:
+            builder.Connect(plant.get_state_output_port(), controller.get_state_input_port())
+        else:
+            builder.Connect(observer.get_estimated_state_output_port(), controller.get_state_input_port())
         builder.Connect(target.get_target_output_port(), controller.get_target_input_port())
         builder.Connect(controller.get_actuation_output_port(), plant.get_actuation_input_port())
 
