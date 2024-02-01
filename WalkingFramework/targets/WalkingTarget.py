@@ -63,8 +63,8 @@ class JoystickInput(WalkingTarget):
             if self.js.get_button(1):
                 self.target_value.kill = True
 
-            des_x_y_vel_unfilt = np.multiply(self.x_y_yaw_scale,np.array([self.js.get_axis(1),self.js.get_axis(0),self.js.get_axis(3)])) + self.x_y_yaw_offset
-            self.target_value.des_x_y_yaw_vel = self.alpha_filt*self.target_value.des_x_y_yaw_vel + (1.-self.alpha_filt)*des_x_y_vel_unfilt
+            des_x_y_vel_unfilt = np.multiply(self.settings.x_y_yaw_scale,np.array([self.js.get_axis(1),self.js.get_axis(0),self.js.get_axis(3)])) + self.settings.x_y_yaw_offset
+            self.target_value.des_x_y_yaw_vel = self.settings.alpha_filt*self.target_value.des_x_y_yaw_vel + (1.-self.settings.alpha_filt)*des_x_y_vel_unfilt
 
         output.set_value(self.target_value)
         return

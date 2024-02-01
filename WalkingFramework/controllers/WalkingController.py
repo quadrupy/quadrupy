@@ -16,6 +16,7 @@ class WalkingController(LeafSystem):
     def __init__(self,n_act):
         LeafSystem.__init__(self)
         self.n_act = n_act
+        self.actuation_data:LLCActuationCommand
         self.actuation_data = LLCActuationCommand(n_act)
         
         self.target_in = self.DeclareAbstractInputPort('target_in',AbstractValue.Make(WalkingTargetValue()))

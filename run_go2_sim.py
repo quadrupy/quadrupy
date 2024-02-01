@@ -1,6 +1,3 @@
-from pydrake.systems.framework import DiagramBuilder
-from pydrake.systems.analysis import Simulator
-
 from WalkingFramework.WalkingSystem import WalkingSystem
 
 if __name__ == '__main__':
@@ -8,6 +5,6 @@ if __name__ == '__main__':
 
     walking_system = WalkingSystem(config_file, is_sim=True)
 
-    walking_system.RunSystem(10.0)
+    walking_system.RunSystem(1000.0, target_rate=1, ignore_error=True)
 
     input("Press Enter to continue...")

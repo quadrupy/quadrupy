@@ -13,5 +13,6 @@ To learn more about drake, check out the documentation [here](https://drake.mit.
 
 To run the walking framework, call:
 ```
-run_walker.py
+run_go2_sim.py
 ```
+with a logitech gamepad f310 plugged in. Press A on the gamepad to start and stop walking. Press B on the gamepad to kill the controller.

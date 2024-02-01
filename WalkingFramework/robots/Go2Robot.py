@@ -69,21 +69,25 @@ class Go2Robot(WalkingRobot):
         plant.SetDefaultPositions([1.,0.,0.,0., 0.,0.,0.325, 0.,np.pi/4,-np.pi/2, 0.,np.pi/4,-np.pi/2, 0.,np.pi/4,-np.pi/2, 0.,np.pi/4,-np.pi/2])
 
         imu_body = plant.GetBodyByName("imu")
+        root_body = plant.GetBodyByName("base")
 
         contacts = [(plant.GetFrameByName("FL_foot"),np.zeros([1,3]),plant.GetCollisionGeometriesForBody(plant.GetBodyByName("FL_foot"))),
                     (plant.GetFrameByName("FR_foot"),np.zeros([1,3]),plant.GetCollisionGeometriesForBody(plant.GetBodyByName("FR_foot"))),
                     (plant.GetFrameByName("RL_foot"),np.zeros([1,3]),plant.GetCollisionGeometriesForBody(plant.GetBodyByName("RL_foot"))),
                     (plant.GetFrameByName("RR_foot"),np.zeros([1,3]),plant.GetCollisionGeometriesForBody(plant.GetBodyByName("RR_foot")))]
         
-        WalkingRobot.__init__(self,builder,plant,scene_graph,imu_body,contacts,actuation_limits,dt=self.settings.controller_dt,is_sim=is_sim)
+        WalkingRobot.__init__(self,builder,plant,scene_graph,imu_body,root_body,contacts,actuation_limits,dt=self.settings.controller_dt,is_sim=is_sim)
         
         # Useful variables for IK
         self.foot_names = ['FL','FR','RL','RR']
-        self.shoulder_positions = np.array([[sign[0]*0.1934, sign[1]*0.0465, 0.] for sign in [[1,-1],[1,1],[-1,-1],[-1,1]]]) # note left is negative y
+        self.shoulder_positions = np.array([[sign[0]*0.1934, sign[1]*0.0465, 0.] for sign in [[1,1],[1,-1],[-1,1],[-1,-1]]]) # note left is positive y
         
     def HardwareUpdate(self):
         raise NotImplementedError
     
+    def GetShoulderPosition(self, foot_idx: int) -> np.array:
+        return self.shoulder_positions[foot_idx]
+
     def CalcFootIK(self, foot_idx: int, foot_pos_robot_frame: np.array, foot_rot: RotationMatrix = None):
         lH = 0.095
         lT = 0.213 # length of both thigh and shank
@@ -96,17 +100,17 @@ class Go2Robot(WalkingRobot):
         # Start with hip angle
         xF = np.clip(footPos[0],-1.,1.)
         yF = np.clip(footPos[1],-1.,1.)
-        zF = np.clip(footPos[2],-1.,0.)
+        zF = np.clip(footPos[2],-1.,-1e-3)
         mirror = False
         if (self.foot_names[foot_idx] == 'FR') or (self.foot_names[foot_idx] == 'RR'):
             mirror = True
             yF *= -1
         yF += lH # Shift yF to put our coordinate frame at the leg root
 
-        q_hip = -np.arcsin((-np.sqrt(np.clip(yF**2 + zF**2 - lH**2,0.,np.inf))*yF - lH*zF)/(yF**2 + zF**2))
+        q_hip = -np.arcsin(np.clip((-np.sqrt(np.clip(yF**2 + zF**2 - lH**2,0.,np.inf))*yF - lH*zF)/(yF**2 + zF**2),-1,1))
         y_hip = lH*(np.cos(q_hip))
         z_hip = lH*np.sin(q_hip)
-        l_leg = np.clip(np.sqrt(xF**2 + (yF - y_hip)**2 + (zF - z_hip)**2),0.,2*lT)
+        l_leg = np.clip(np.sqrt(xF**2 + (yF - y_hip)**2 + (zF - z_hip)**2),1e-3,2*lT-1e-3)
         q_knee = -2*np.arccos(l_leg/(2*lT))
         q_thigh = np.arcsin(-xF/l_leg) - q_knee/2
 

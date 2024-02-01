@@ -77,6 +77,7 @@ class WalkingRobot(LeafSystem):
                       reference_plant:MultibodyPlant,                                    # Robot plant, used to keep track of robot model parameters 
                       scene_graph:SceneGraph,                                            # Scene graph, used to keep track of robot geometry
                       imu_body:Body,                                                     # IMU body, used to contextualize IMU measurements
+                      root_body:Body,                                                    # Root body, used to contextualize robot state
                       contacts:'list[tuple[BodyFrame,list[np.array],list[GeometryId]]]', # List of foot frames and list of contact points in each frame
                       actuation_limits:np.array = None,                                  # Array of max absolute joint torque for each actuator (nu array)
                       dt:float = 1e-3,                                                   # Time step between control data updates
@@ -88,6 +89,8 @@ class WalkingRobot(LeafSystem):
         self.scene_graph = scene_graph
         self.imu_body = imu_body 
         self.imu_frame = imu_body.body_frame()
+        self.root_body = root_body
+        self.root_frame = root_body.body_frame()
         self.contacts = contacts
         self.num_contacts = sum([len(c[1]) for c in contacts])
         self.actuation_limits = actuation_limits
@@ -208,5 +211,10 @@ class WalkingRobot(LeafSystem):
 
     def CalcFootIK(self,foot_idx:int,foot_pos_robot_frame:np.array,foot_rot:RotationMatrix=RotationMatrix())->np.array:
         # Calculate the joint positions for the given foot position and rotation
+        # This is useful for calculating the joint positions for the legs
+        raise NotImplementedError
+    
+    def GetShoulderPosition(self,foot_idx:int)->np.array:
+        # Get the shoulder position for the given foot index
         # This is useful for calculating the joint positions for the legs
         raise NotImplementedError

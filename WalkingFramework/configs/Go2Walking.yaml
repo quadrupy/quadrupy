@@ -1,37 +1,45 @@
 robot:
   class_name: Go2Robot
-  friction: 0.5
+  friction: 0.75
   llc_dt: 0.001
   controller_dt: 0.01
 
 controller:
   class_name: QuadrupedWBC
   gait_params:
-    des_height: 0.35
-    step_time: 0.2
+    des_height: 0.325
+    step_time: 0.25
     step_height: 0.05
 
   raibert_params:
     step_kd: [0.05,0.05]
     step_clip: [0.5,0.5]
-    com_kd: [10.,20.]
 
-  wbqp_targets:
+  wbqp_targets_stand:
+    body_orientation: 
+      Kp: [400., 400., 400.]
+      Kd: [20., 20., 20.]
+      weights: [1.e+4,1.e+4,1.e+4]
+    body_translation:
+      Kp: [200., 200., 200.]
+      Kd: [20., 20., 20.]
+      weights: [1.e+4,1.e+4,1.e+4]
+    
+  wbqp_targets_walk:
     body_orientation: 
       Kp: [400., 400., 0.]
       Kd: [20., 20., 10.]
-      Kp_stand: [400., 400., 400.]
-      Kd_stand: [20., 20., 20.]
       weights: [1.e+4,1.e+4,1.e+4]
     body_translation:
       Kp: [0., 0., 200.]
-      Kd: [0., 0., 20.]
-      Kp_stand: [200., 200., 200.]
-      Kd_stand: [20., 20., 20.]
+      Kd: [10., 20., 20.]
       weights: [1.e+4,1.e+4,1.e+4]
-    
+
   swing_params:
     Kp: 25.
+    Kd: 1.
+
+  stance_params:
     Kd: 1.
 
   wbqp_params:
@@ -40,6 +48,7 @@ controller:
     actuation_cost: 1.
     contact_cost: 0.
     foot_on_ground_cost: 1.e+6
+    swing_foot_tracking_cost: 1.e+4
     kin_constraint_cost: 1.e+6
     reqularizing_cost: 1.e-6
     delta_cost: 1.e+1
