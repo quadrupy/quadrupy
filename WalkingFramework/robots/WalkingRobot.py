@@ -193,15 +193,17 @@ class WalkingRobot(LeafSystem):
         # Calculate the joint indices for the joints that are dependent on the given frame
         # This is useful for calculating the joint indices for the legs
         joint_indices = []
+        true_ind = 0
         for i in range(self.plant.num_joints()):
             joint = self.plant.get_joint(JointIndex(i))
-            if joint.num_velocities() == 0:
+            if joint.num_velocities() != 1:
                 continue
             joint_bodies = self.plant.GetBodiesKinematicallyAffectedBy([JointIndex(i)])
             for j in joint_bodies:
                 if self.plant.get_body(j).body_frame().index() == frame.index():
-                    joint_indices.append(i)
+                    joint_indices.append(true_ind)
                     break
+            true_ind += 1
         return joint_indices
 
     def CalcFootIK(self,foot_idx:int,foot_pos_robot_frame:np.array,foot_rot:RotationMatrix=RotationMatrix())->np.array:

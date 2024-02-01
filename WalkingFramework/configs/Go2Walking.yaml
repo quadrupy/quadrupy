@@ -7,7 +7,7 @@ robot:
 controller:
   class_name: QuadrupedWBC
   gait_params:
-    des_height: 0.325
+    des_height: 0.35
     step_time: 0.2
     step_height: 0.05
 
@@ -20,10 +20,14 @@ controller:
     body_orientation: 
       Kp: [400., 400., 0.]
       Kd: [20., 20., 10.]
+      Kp_stand: [400., 400., 400.]
+      Kd_stand: [20., 20., 20.]
       weights: [1.e+4,1.e+4,1.e+4]
     body_translation:
-      Kp: [100., 100., 200.]
-      Kd: [10., 10., 20.]
+      Kp: [0., 0., 200.]
+      Kd: [0., 0., 20.]
+      Kp_stand: [200., 200., 200.]
+      Kd_stand: [20., 20., 20.]
       weights: [1.e+4,1.e+4,1.e+4]
     
   swing_params:

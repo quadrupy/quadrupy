@@ -1,7 +1,7 @@
 from pydrake.common.value import AbstractValue
 from pydrake.systems.framework import Context
 from pydrake.multibody.tree import JacobianWrtVariable
-from pydrake.solvers import MathematicalProgram
+from pydrake.solvers import MathematicalProgram, OsqpSolver, SolverOptions, CommonSolverOption
 from pydrake.math import RotationMatrix
 from pydrake.common.eigen_geometry import Quaternion, AngleAxis
 
@@ -113,8 +113,8 @@ class QuadrupedWBC(WalkingController):
 
         # Pull out some useful values
         xy_vel = qv_world[3:5]
-        des_xy_vel = target_in[:2]
-        des_yaw_vel = target_in[2]
+        des_xy_vel = target_in.des_x_y_yaw_vel[:2]
+        des_yaw_vel = target_in.des_x_y_yaw_vel[2]
 
         # Convert robot state to body coordinates
         if np.linalg.norm(qv_world) < 1e-6:
@@ -126,8 +126,8 @@ class QuadrupedWBC(WalkingController):
         stance_feet, swing_feet, time_to_step = self.fsm.Update(t)
 
         # Get current foot positions and jacobians
-        foot_locations = [self.robot.plant.CalcPointsPositions(self.controller_context,c[0],c[1].flatten(),self.robot.plant.world_frame()) for c in self.robot.contacts]
-        mean_stance_foot_x_y = np.average(foot_locations[stance_feet],axis=0)
+        foot_locations = np.hstack([self.robot.plant.CalcPointsPositions(self.controller_context,c[0],c[1].flatten(),self.robot.plant.world_frame()) for c in self.robot.contacts]).T
+        mean_stance_foot_x_y = np.average(foot_locations[stance_feet,:2],axis=0)
         foot_jacobians = [self.robot.plant.CalcJacobianTranslationalVelocity(self.controller_context,JacobianWrtVariable.kV,c[0],c[1].flatten(),self.robot.plant.world_frame(),self.robot.plant.world_frame()) for c in self.robot.contacts]
         foot_bias = [self.robot.plant.CalcBiasTranslationalAcceleration(self.controller_context,JacobianWrtVariable.kV,c[0],c[1].flatten(),self.robot.plant.world_frame(),self.robot.plant.world_frame()) for c in self.robot.contacts]
 
@@ -137,12 +137,12 @@ class QuadrupedWBC(WalkingController):
             des_sf_acc = None
 
             # Calculate the desired body accelerations
-            des_body_acc = self.BodyPDControl(qv_robot[6:], des_x_y_pos=mean_stance_foot_x_y, des_x_y_vel=target_in.des_x_y_yaw_vel, use_standing_gains=True)
+            des_body_acc = self.BodyPDControl(q_body = qv_robot[:7], v_body = qv_robot[self.nq:self.nq+6], des_x_y_pos=mean_stance_foot_x_y, des_x_y_yaw_vel=target_in.des_x_y_yaw_vel, use_standing_gains=True)
 
             # Get desired torques
             desired_tau = self.wbqp_four_contact.UpdateAndSolve(self.controller_context,\
-                                                                stance_jacobians = foot_jacobians[stance_feet], stance_bias = foot_bias[stance_feet], des_body_acc  = des_body_acc,\
-                                                                swing_jacobians  = foot_jacobians[swing_feet] , swing_bias  = foot_bias[swing_feet] , des_swing_acc = des_sf_acc)
+                                                                stance_jacobians = [foot_jacobians[f] for f in stance_feet], stance_bias = [foot_bias[f] for f in stance_feet], des_body_acc  = des_body_acc,\
+                                                                swing_jacobians  = [foot_jacobians[f] for f in swing_feet] , swing_bias  = [foot_bias[f] for f in swing_feet] , des_swing_acc = des_sf_acc)
         
         else: # In double stance
             # Get desired Raibert footsteps
@@ -225,13 +225,13 @@ class QuadrupedWBC(WalkingController):
         if use_standing_gains:
             Kp_pos = self.settings.wbqp_targets['body_translation']['Kp_stand']
             Kd_pos = self.settings.wbqp_targets['body_translation']['Kd_stand']
-            Kp_rot = self.settings.wbqp_targets['body_rotation']['Kp_stand']
-            Kd_rot = self.settings.wbqp_targets['body_rotation']['Kd_stand']
+            Kp_rot = self.settings.wbqp_targets['body_orientation']['Kp_stand']
+            Kd_rot = self.settings.wbqp_targets['body_orientation']['Kd_stand']
         else:  
             Kp_pos = self.settings.wbqp_targets['body_translation']['Kp']
             Kd_pos = self.settings.wbqp_targets['body_translation']['Kd']
-            Kp_rot = self.settings.wbqp_targets['body_rotation']['Kp']
-            Kd_rot = self.settings.wbqp_targets['body_rotation']['Kd']
+            Kp_rot = self.settings.wbqp_targets['body_orientation']['Kp']
+            Kd_rot = self.settings.wbqp_targets['body_orientation']['Kd']
 
         # Calc desired accelerations
         des_body_acc = np.zeros(6)
@@ -239,7 +239,7 @@ class QuadrupedWBC(WalkingController):
         # Rotational PD
         body_rot_mat = RotationMatrix(Quaternion(q_body[:4]/np.linalg.norm(q_body[:4])))
         des_body_rot_mat = RotationMatrix(Quaternion(des_body_rot))
-        body_rot_err:AngleAxis = des_body_rot_mat@(body_rot_mat.inverse()).ToAngleAxis()
+        body_rot_err:AngleAxis = (des_body_rot_mat@body_rot_mat.inverse()).ToAngleAxis()
         body_rot_err = body_rot_err.angle()*body_rot_err.axis()
         body_rot_vel_err = des_body_rot_vel - v_body[:3]
         des_body_acc[:3] = Kp_rot*body_rot_err + Kd_rot*body_rot_vel_err
@@ -253,22 +253,25 @@ class QuadrupedWBC(WalkingController):
     
 class WholeBodyQP():
     def __init__(self,robot:WalkingRobot,wbqp_targets,wbqp_params:dict,n_contact) -> None:
+        self.robot = robot
         self.n_u = robot.num_act
         self.n_acc = robot.plant.num_velocities()
         self.n_contact = n_contact
         self.n_swing = robot.num_contacts - self.n_contact
         self.params = wbqp_params
+        self.tau_prev = np.zeros(self.n_u)
 
         # Initialize the mathematical program
         self.prog = MathematicalProgram()
         self.joint_torques = self.prog.NewContinuousVariables(self.n_u,'tau')
         self.accelerations = self.prog.NewContinuousVariables(self.n_acc,'ddq')
-        self.rotational_accelerations = self.accelerations[:3]
-        self.translational_accelerations = self.accelerations[3:6]
+        self.body_accelerations = self.accelerations[:6]
         self.joint_accelerations = self.accelerations[6:]
         self.contact_forces = np.vstack([self.prog.NewContinuousVariables(self.n_contact,'lambda_'+['x','y','z'][i]) for i in range(3)]).T # [[x_0,y_0,z_0],[x_1,y_1,z_1],...,[x_3,y_3,z_3]]
         self.contact_forces_vec = self.contact_forces.flatten() # [x_0,y_0,z_0,x_1,y_1,z_1,...,x_3,y_3,z_3]
         self.hardstop_slacks = self.prog.NewContinuousVariables(self.n_u,'s_hs')
+        self.all_vars = self.prog.decision_variables()
+        self.n_vars = len(self.all_vars)
 
         # Placeholder context for dynamics values
         ctx = robot.plant.CreateDefaultContext()
@@ -277,37 +280,40 @@ class WholeBodyQP():
         self.J_stance = np.zeros([3*self.n_contact,self.n_acc])
         self.dJdq_stance = np.zeros([3*self.n_contact,1])
         self.B = robot.plant.MakeActuationMatrix()
-        self.CalcInertialDynamics(robot,ctx)
+        self.CalcInertialDynamics(ctx)
 
         # Dynamics constraints (must be updated at each timestep)
         dyn_A,dyn_b = self.GetDynamicsConstraints()
-        dyn_vars = np.vstack([self.accelerations,self.joint_torques,self.contact_forces_vec])
+        dyn_vars = np.hstack([self.accelerations,self.joint_torques,self.contact_forces_vec])
         self.dyn_constraint = self.prog.AddLinearEqualityConstraint(dyn_A,dyn_b,dyn_vars)
+        self.dyn_constraint.evaluator().set_description('dynamics_constraint')
 
         # Joint hardstop constraints (must be updated at each timestep)
-        hs_A,hs_lb,hs_ub = self.GetJointHardstopConstraints(robot,ctx)
-        hs_vars = np.vstack([self.joint_accelerations,self.hardstop_slacks])
-        self.hs_constraint = self.prog.AddLinearConstraint(hs_A,hs_lb,hs_ub,hs_vars)
-        hs_slack_Q = np.eye(self.n_u)*self.params.get('kin_constraint_cost',1.e+6)
-        self.hs_slack_cost = self.prog.AddQuadraticCost(hs_slack_Q,np.zeros(self.n_u),self.hardstop_slacks)
+        # hs_A,hs_lb,hs_ub = self.GetJointHardstopConstraints(robot,ctx)
+        # hs_vars = np.vstack([self.joint_accelerations,self.hardstop_slacks])
+        # self.hs_constraint = self.prog.AddLinearConstraint(hs_A,hs_lb,hs_ub,hs_vars)
+        # hs_slack_Q = np.eye(self.n_u)*self.params.get('kin_constraint_cost',1.e+6)
+        # self.hs_slack_cost = self.prog.AddQuadraticCost(hs_slack_Q,np.zeros(self.n_u),self.hardstop_slacks)
 
         # Actuation constraints (unchanged across timesteps)
-        self.torque_limits = np.hstack([-robot.actuation_limits*np.ones([self.n_u,1]),robot.actuation_limits*np.ones([self.n_u,1])])
+        self.torque_limits = np.vstack([-robot.actuation_limits,robot.actuation_limits]).T
         self.torque_constraint = self.prog.AddBoundingBoxConstraint(self.torque_limits[:,0],self.torque_limits[:,1],self.joint_torques)
+        self.torque_constraint.evaluator().set_description('torque_constraint')
 
         # Friction cone constraints (unchanged across timesteps)
         fric_A,fric_lb,fric_ub = self.GetFrictionConeConstraints()
         self.fric_constraints = [self.prog.AddLinearConstraint(fric_A,fric_lb,fric_ub,self.contact_forces[i,:]) for i in range(self.n_contact)]
+        [f.evaluator().set_description('fric_constraints_'+str(i)) for i,f in enumerate(self.fric_constraints)]
 
         # Foot on ground penalty (must be updated at each timestep)
         fog_Q,fog_b = self.GetFootOnGroundPenalty()
-        self.fog_cost = self.prog.AddQuadraticCost(fog_Q,fog_b,self.accelerations)
+        self.fog_cost = self.prog.AddQuadraticCost(fog_Q,fog_b,self.accelerations,is_convex=True)
+        self.fog_cost.evaluator().set_description('fog_cost')
 
         # Body tracking costs (must be updated at each timestep)
-        self.rotation_tracking_Q = np.diag(wbqp_targets['body_orientation']['weights'])
-        self.rotation_tracking_cost = self.prog.AddQuadraticCost(self.rotation_tracking_Q,np.zeros(3),self.rotational_accelerations)
-        self.translation_tracking_Q = np.diag(wbqp_targets['body_translation']['weights'])
-        self.translation_tracking_cost = self.prog.AddQuadraticCost(self.translation_tracking_Q,np.zeros(3),self.translational_accelerations)
+        self.body_tracking_Q = np.diag(np.concatenate([wbqp_targets['body_orientation']['weights'],wbqp_targets['body_translation']['weights']]))
+        self.body_tracking_cost = self.prog.AddQuadraticCost(self.body_tracking_Q,np.zeros(6),self.body_accelerations)
+        self.body_tracking_cost.evaluator().set_description('body_tracking_cost')
 
         if self.n_swing > 0:
             self.J_swing = np.zeros([3*self.n_swing,self.n_acc])
@@ -316,12 +322,29 @@ class WholeBodyQP():
             # Swing foot tracking costs (must be updated at each timestep)
             swing_Q,swing_b = self.GetSwingFootTrackingCosts(np.zeros(3*self.n_swing))
             self.swing_tracking_cost = self.prog.AddQuadraticCost(swing_Q,swing_b,self.accelerations)
+            self.swing_tracking_cost.evaluator().set_description('swing_tracking_cost')
 
         # Actuation costs (unchanged across timesteps)
+        actuation_Q = np.eye(self.n_u)*wbqp_params['actuation_cost']
+        self.actuation_cost = self.prog.AddQuadraticCost(actuation_Q,np.zeros(self.n_u),self.joint_torques)
+        self.actuation_cost.evaluator().set_description('actuation_cost')
 
         # Contact costs (unchanged across timesteps)
+        contact_Q = np.eye(3*self.n_contact)*wbqp_params['contact_cost']
+        self.contact_cost = self.prog.AddQuadraticCost(contact_Q,np.zeros(3*self.n_contact),self.contact_forces_vec)
+        self.contact_cost.evaluator().set_description('contact_cost')
 
-        pass
+        # Regularizing costs (unchanged across timesteps)
+        reg_Q = np.eye(self.n_vars)*wbqp_params['reqularizing_cost']
+        self.reg_cost = self.prog.AddQuadraticCost(reg_Q,np.zeros(self.n_vars),self.all_vars)
+        self.reg_cost.evaluator().set_description('reg_cost')
+
+        self.solver = OsqpSolver()
+        self.solver_options = SolverOptions()
+        # self.solver_options.SetOption(CommonSolverOption.kPrintToConsole,1)
+        # self.solver_options.SetOption(self.solver.solver_id(),'max_iter',10000)
+
+        return
 
     def UpdateAndSolve(self,controller_context:Context,stance_jacobians,stance_bias,des_body_acc,swing_jacobians,swing_bias,des_swing_acc):
         # Update the dynamics and store the foot jacobians
@@ -331,12 +354,12 @@ class WholeBodyQP():
 
         # Update the mathematical program
         #   Dynamics constraint
-        dyn_A,dyn_b = self.GetDynamicsConstraints(controller_context)
+        dyn_A,dyn_b = self.GetDynamicsConstraints()
         self.dyn_constraint.evaluator().UpdateCoefficients(dyn_A,dyn_b)
 
         #   Foot on ground penalty
         fog_Q,fog_b = self.GetFootOnGroundPenalty()
-        self.fog_cost.evaluator().UpdateCoefficients(self.params['foot_on_ground_cost']*fog_Q,self.params['foot_on_ground_cost']*fog_b)
+        self.fog_cost.evaluator().UpdateCoefficients(self.params['foot_on_ground_cost']*fog_Q,self.params['foot_on_ground_cost']*fog_b,is_convex=True)
 
         #   Swing foot tracking
         if self.n_swing > 0:
@@ -348,19 +371,33 @@ class WholeBodyQP():
             swing_Q,swing_b = self.GetSwingFootTrackingCosts(des_swing_acc)
             self.swing_tracking_cost.evaluator().UpdateCoefficients(self.params['swing_foot_tracking_cost']*swing_Q,self.params['swing_foot_tracking_cost']*swing_b)
 
+        #   Body tracking
+        body_b = -self.body_tracking_Q@des_body_acc
+        self.body_tracking_cost.evaluator().UpdateCoefficients(self.body_tracking_Q,body_b)
+
         # Solve the mathematical program
+        # [c.evaluator().is_convex() for c in self.prog.GetAllCosts()]
+        res = self.solver.Solve(self.prog,None,self.solver_options)
+        
+        # Check for succesful solve
+        if res.is_success():
+            # Get the desired torques
+            tau_out = res.GetSolution(self.joint_torques)
+            self.tau_prev = tau_out
+        else:
+            tau_out = self.tau_prev
 
         # Return the desired torques
-        return np.zeros(self.nu)
+        return tau_out
 
-    def CalcInertialDynamics(self,robot:WalkingRobot,ctx:Context):
-        self.M = robot.plant.CalcMassMatrix(ctx)
-        self.C = robot.plant.CalcBiasTerm(ctx)
+    def CalcInertialDynamics(self,ctx:Context):
+        self.M = self.robot.plant.CalcMassMatrix(ctx)
+        self.CG = self.robot.plant.CalcBiasTerm(ctx) - self.robot.plant.CalcGravityGeneralizedForces(ctx)
 
     def GetDynamicsConstraints(self):
         # M*ddq + C = B*tau + J^T*lambda
         # Variable order: [ddq,tau,lambda]
-        return np.hstack([self.M,-self.B,-self.J_stance.T]), -self.C 
+        return np.hstack([self.M,-self.B,-self.J_stance.T]), -self.CG
 
     def GetFrictionConeConstraints(self):
         # |lambda_x| + |lambda_y| <= mu*lambda_z
@@ -386,12 +423,13 @@ class WholeBodyQP():
         # Minimize 0.5*||J*ddq + dJ*dq||^2 = 0.5*ddq^T*J^T*J*ddq + (J^T*dJ*dq)^T*ddq + ... = 0.5*x^T*Q*x + b^T*x + ...
         # x = ddq, Q = J^T*J, b = J^T*dJ*dq
         return self.J_stance.T@self.J_stance, self.J_stance.T@self.dJdq_stance
+        # return np.eye(self.n_acc), np.zeros(self.n_acc)
 
     def GetSwingFootTrackingCosts(self, des_swing_acc):
         # Swing foot acceleration = d(J*dq) = J*ddq + dJ*dq
         # Minimize 0.5*||J*ddq + dJ*dq - swing_acc||^2 = 0.5*ddq^T*J^T*J*ddq + (J^T*(dJ*dq-swing_acc))^T*ddq + ... = 0.5*x^T*Q*x + b^T*x + ...
         # x = ddq, Q = J^T*J, b = J^T*(dJ*dq - swing_acc)
-        return self.J_swing.T@self.J_swing, self.J_swing.T@(self.dJdq_swing - des_swing_acc)
+        return self.J_swing.T@self.J_swing, self.J_swing.T@(self.dJdq_swing.flatten() - des_swing_acc.flatten())
 
     def GetJointHardstopConstraints(self,robot:WalkingRobot,ctx:Context):
         pass
@@ -421,7 +459,7 @@ class FiniteStateMachine():
     def __init__(self,step_time) -> None:
         pass
 
-    def update(self,curr_time):
+    def Update(self,curr_time):
         stance_feet = [0,1,2,3]
         swing_feet = []
         time_to_step = np.inf
