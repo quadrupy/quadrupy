@@ -26,3 +26,5 @@ sudo ifconfig eth0 down # eth0 is your PC Ethernet port
 sudo ifconfig eth0 192.168.123.162/24
 sudo ifconfig eth0 up
 ping 192.168.123.161
+
+[go2 sk center](https://support.unitree.com/home/en/developer)
