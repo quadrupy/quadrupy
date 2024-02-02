@@ -27,4 +27,4 @@ sudo ifconfig eth0 192.168.123.162/24
 sudo ifconfig eth0 up
 ping 192.168.123.161
 
-[go2 sk center](https://support.unitree.com/home/en/developer)
+[go2 sdk center](https://support.unitree.com/home/en/developer)
