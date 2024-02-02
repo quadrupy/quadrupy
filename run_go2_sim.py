@@ -7,4 +7,6 @@ if __name__ == '__main__':
 
     walking_system.RunSystem(1000.0, target_rate=1, ignore_error=True)
 
+    walking_system.PlotSystemGraph()
+
     input("Press Enter to continue...")

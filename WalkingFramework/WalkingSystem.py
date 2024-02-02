@@ -1,5 +1,7 @@
 from pydrake.systems.framework import DiagramBuilder
 from pydrake.systems.analysis import Simulator
+import matplotlib.pyplot as plt
+from pydrake.systems.drawing import plot_system_graphviz
 
 import yaml
 
@@ -72,3 +74,8 @@ class WalkingSystem():
         self.robot.ReplayRecording()
 
         return
+    
+    def PlotSystemGraph(self):
+        plt.figure()
+        plot_system_graphviz(self.diagram)
+        plt.show()
