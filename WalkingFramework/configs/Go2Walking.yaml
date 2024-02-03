@@ -55,6 +55,9 @@ controller:
     tau_filter_alpha: 0.5
     kb: 0.
 
+observer:
+  class_name: InekfObserver
+
 target:
   class_name: JoystickInput
   x_y_yaw_offset: [0.,0.,0.]

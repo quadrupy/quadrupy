@@ -25,9 +25,9 @@ class WalkingSystem():
         self.observer = None
         if config_dict.__contains__('observer'):
             observer_class = config_dict['observer']['class_name']
-            if observer_class == 'WalkingObserver':
-                from .observers.WalkingObserver import WalkingObserver
-                self.observer = WalkingObserver(self.robot, config_dict=config_dict['observer'])
+            if observer_class == 'InekfObserver':
+                from .observers.InekfObserver import InekfObserver
+                self.observer = InekfObserver(self.robot,config_dict=config_dict['observer'])
             else:
                 raise NotImplementedError(f'Observer class {observer_class} not implemented')
             

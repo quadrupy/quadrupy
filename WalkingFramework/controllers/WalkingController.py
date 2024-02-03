@@ -5,8 +5,6 @@ from pydrake.math import RotationMatrix, RollPitchYaw
 from pydrake.common.eigen_geometry import Quaternion
 
 import numpy as np
-import pygame
-import time
 
 from ..robots.WalkingRobot import LLCActuationCommand, WalkingRobot
 from ..observers.WalkingObserver import WalkingObserver

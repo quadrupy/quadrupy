@@ -3,7 +3,7 @@ from __future__ import annotations
 from pydrake.common.value import AbstractValue
 from pydrake.systems.framework import Context
 from pydrake.multibody.tree import JacobianWrtVariable
-from pydrake.solvers import MathematicalProgram, OsqpSolver, SolverOptions, CommonSolverOption
+from pydrake.solvers import MathematicalProgram, OsqpSolver, SolverOptions
 from pydrake.math import RotationMatrix, BsplineBasis, RollPitchYaw
 from pydrake.trajectories import BsplineTrajectory
 from pydrake.common.eigen_geometry import Quaternion, AngleAxis
@@ -12,7 +12,7 @@ import numpy as np
 import time
 
 from .WalkingController import WalkingController, WorldToRobotCoordinates
-from ..robots.WalkingRobot import WalkingRobot, LLCActuationCommand
+from ..robots.WalkingRobot import WalkingRobot
 from ..targets.WalkingTarget import WalkingTargetValue
 
 class QuadrupedWBCSettings():
@@ -131,6 +131,7 @@ class QuadrupedWBC(WalkingController):
 
         # Convert robot state to body coordinates
         if np.linalg.norm(qv_world) < 1e-6:
+            # If the quaternion is zero, the robot is not initialized. Return zero torques
             return super().CalcOutput(context, output)
         qv_robot = WorldToRobotCoordinates(qv_world,self.nq)
         self.robot.plant.SetPositionsAndVelocities(self.controller_context,qv_robot)

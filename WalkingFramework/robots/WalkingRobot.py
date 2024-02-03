@@ -1,5 +1,5 @@
-from pydrake.systems.framework import LeafSystem, Context, EventStatus, DiagramBuilder, BasicVector
-from pydrake.multibody.plant import MultibodyPlant, AddMultibodyPlantSceneGraph
+from pydrake.systems.framework import LeafSystem, Context, DiagramBuilder, BasicVector
+from pydrake.multibody.plant import MultibodyPlant
 from pydrake.common.value import AbstractValue
 from pydrake.multibody.tree import BodyFrame, Body, JointIndex
 from pydrake.systems.analysis import Simulator
@@ -36,6 +36,9 @@ class SimLLC(LeafSystem):
         # Set this manually before each simulation step
         self.llc_in = LLCActuationCommand(n_act)
 
+        # Use this to keep track of the output torque
+        self.output_torque = np.zeros(n_act)
+
         self.state_in = self.DeclareVectorInputPort('joint_qdq',2*n_act+13)
         self.torque_out = self.DeclareVectorOutputPort('torque_out',n_act,self.CalcTorque)
 
@@ -47,6 +50,7 @@ class SimLLC(LeafSystem):
         output_torque = self.llc_in.Kp*(self.llc_in.q-q) + self.llc_in.Kd*(self.llc_in.dq-dq) + self.llc_in.tau
         output_torque = np.clip(output_torque,-self.actuation_limits,self.actuation_limits)
 
+        self.output_torque = output_torque
         output.set_value(output_torque)
 
     def SetLLCCommand(self,llc_in: LLCActuationCommand):
@@ -99,7 +103,7 @@ class WalkingRobot(LeafSystem):
         self.is_sim = is_sim
         
         self.actuation_data = LLCActuationCommand(self.num_act)
-        self.sensing_data = SensorData(reference_plant.num_joints(),self.num_contacts)
+        self.sensing_data = SensorData(reference_plant.num_actuators(),self.num_contacts)
         self.cheater_state = np.zeros(reference_plant.num_multibody_states())
 
         nodep = set([self.time_ticket()])
@@ -169,10 +173,11 @@ class WalkingRobot(LeafSystem):
         imu_ang_vel_world_frame = body_velocities[self.imu_body.index()].rotational()
 
         # Set the sensor output
-        self.sensing_data.joint_pos = self.plant.GetPositions(self.sim_plant_ctx)
-        self.sensing_data.joint_vel = self.plant.GetVelocities(self.sim_plant_ctx)
+        self.sensing_data.joint_pos = self.plant.GetPositions(self.sim_plant_ctx)[7:]
+        self.sensing_data.joint_vel = self.plant.GetVelocities(self.sim_plant_ctx)[6:]
         self.sensing_data.imu_acc = imu_rot.inverse()@imu_acc_world_frame
         self.sensing_data.imu_ang_vel = imu_rot.inverse()@imu_ang_vel_world_frame
+        self.sensing_data.joint_torque = self.sim_llc.output_torque
 
         self.cheater_state = self.plant.GetPositionsAndVelocities(self.sim_plant_ctx)
 
