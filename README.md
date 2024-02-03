@@ -9,6 +9,14 @@ pip install -r requirements.txt
 
 To learn more about drake, check out the documentation [here](https://drake.mit.edu/pydrake/index.html)
 
+To compile the third party C++ libraries:
+```
+sudo apt install libeigen3-dev
+cd WalkingFramework/third_party
+cmake .
+make all
+```
+
 ## Run 
 
 To run the walking framework, call:
