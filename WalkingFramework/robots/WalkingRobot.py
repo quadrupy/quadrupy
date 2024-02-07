@@ -1,5 +1,5 @@
 from pydrake.systems.framework import LeafSystem, Context, DiagramBuilder, BasicVector
-from pydrake.multibody.plant import MultibodyPlant
+from pydrake.multibody.plant import MultibodyPlant, ContactResults
 from pydrake.common.value import AbstractValue
 from pydrake.multibody.tree import BodyFrame, Body, JointIndex
 from pydrake.systems.analysis import Simulator
@@ -67,6 +67,7 @@ class SensorData():
         self.imu_acc = np.zeros(3)
         self.imu_ang_vel = np.zeros(3)
         self.contact_state = np.zeros(n_contacts)
+        self.time_stamp = 0.0
 
     def copy_from(self, sensor_data_in: "SensorData"):
         np.copyto(self.joint_pos,sensor_data_in.joint_pos)
@@ -75,6 +76,7 @@ class SensorData():
         np.copyto(self.imu_acc,sensor_data_in.imu_acc)
         np.copyto(self.imu_ang_vel,sensor_data_in.imu_ang_vel)
         np.copyto(self.contact_state,sensor_data_in.contact_state)
+        self.time_stamp = sensor_data_in.time_stamp
 
 class WalkingRobot(LeafSystem):
     def __init__(self,builder:DiagramBuilder,                                            # DiagramBuilder object containing the reference plant  
@@ -82,7 +84,7 @@ class WalkingRobot(LeafSystem):
                       scene_graph:SceneGraph,                                            # Scene graph, used to keep track of robot geometry
                       imu_body:Body,                                                     # IMU body, used to contextualize IMU measurements
                       root_body:Body,                                                    # Root body, used to contextualize robot state
-                      contacts:'list[tuple[BodyFrame,list[np.array],list[GeometryId]]]', # List of foot frames and list of contact points in each frame
+                      contacts:'list[tuple[BodyFrame,np.array,GeometryId]]',             # List of foot frames and list of contact points in each frame
                       actuation_limits:np.array = None,                                  # Array of max absolute joint torque for each actuator (nu array)
                       dt:float = 1e-3,                                                   # Time step between control data updates
                       is_sim:bool = True,                                                # Flag to indicate whether this is a simulation or hardware
@@ -96,7 +98,7 @@ class WalkingRobot(LeafSystem):
         self.root_body = root_body
         self.root_frame = root_body.body_frame()
         self.contacts = contacts
-        self.num_contacts = sum([len(c[1]) for c in contacts])
+        self.num_contacts = len(contacts)
         self.actuation_limits = actuation_limits
         self.num_act = reference_plant.num_actuators()
         self.dt = dt
@@ -168,9 +170,10 @@ class WalkingRobot(LeafSystem):
         # Calculate the sensor data
         body_accelerations = self.plant.get_body_spatial_accelerations_output_port().Eval(self.sim_plant_ctx)
         body_velocities = self.plant.get_body_spatial_velocities_output_port().Eval(self.sim_plant_ctx)
-        imu_rot:RotationMatrix = self.plant.CalcRelativeTransform(self.sim_plant_ctx,self.imu_frame,self.plant.world_frame()).rotation()
-        imu_acc_world_frame = body_accelerations[self.imu_body.index()].translational()
+        imu_rot:RotationMatrix = self.plant.CalcRelativeTransform(self.sim_plant_ctx,self.plant.world_frame(),self.imu_frame).rotation()
+        imu_acc_world_frame = body_accelerations[self.imu_body.index()].translational() + np.array([0,0,9.81])
         imu_ang_vel_world_frame = body_velocities[self.imu_body.index()].rotational()
+        contact_results:ContactResults = self.plant.get_contact_results_output_port().Eval(self.sim_plant_ctx)
 
         # Set the sensor output
         self.sensing_data.joint_pos = self.plant.GetPositions(self.sim_plant_ctx)[7:]
@@ -178,6 +181,14 @@ class WalkingRobot(LeafSystem):
         self.sensing_data.imu_acc = imu_rot.inverse()@imu_acc_world_frame
         self.sensing_data.imu_ang_vel = imu_rot.inverse()@imu_ang_vel_world_frame
         self.sensing_data.joint_torque = self.sim_llc.output_torque
+        self.sensing_data.contact_state = np.zeros(self.num_contacts)
+        for i in range(contact_results.num_point_pair_contacts()):
+            ppci = contact_results.point_pair_contact_info(i)
+            for j,c in enumerate(self.contacts):
+                bi = c[0].body().index()
+                if bi == ppci.bodyA_index() or bi == ppci.bodyB_index():
+                    self.sensing_data.contact_state[j] = 1
+        self.sensing_data.time_stamp = self.sim_ctx.get_time()
 
         self.cheater_state = self.plant.GetPositionsAndVelocities(self.sim_plant_ctx)
 

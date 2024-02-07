@@ -2,7 +2,7 @@ robot:
   class_name: Go2Robot
   friction: 0.75
   llc_dt: 0.001
-  controller_dt: 0.01
+  controller_dt: 0.005
 
 controller:
   class_name: QuadrupedWBC
@@ -57,6 +57,14 @@ controller:
 
 observer:
   class_name: InekfObserver
+  encoder_noise: 0.001
+  gyro_noise: 10.
+  gyro_bias: 0.0
+  accel_noise: 10.
+  accel_bias: 0.0
+  contact_noise: 10.
+  foot_offset: 0.025
+  add_visualizer: True
 
 target:
   class_name: JoystickInput
