@@ -6,7 +6,7 @@ from pydrake.systems.drawing import plot_system_graphviz
 import yaml
 
 class WalkingSystem():
-    def __init__(self, config_file: str, is_sim=True):
+    def __init__(self, config_file: str, is_sim=True, use_cheater_observer=False):
         self.is_sim = is_sim
         with open(config_file) as file:
             config_dict = yaml.safe_load(file)
@@ -54,9 +54,12 @@ class WalkingSystem():
         if self.target is not None:
             builder.AddSystem(self.target)
         if self.observer is not None:
-            self.observer.AddToBuilderAndConnect(builder, robot=self.robot)
+            self.observer.AddToBuilderAndConnect(builder, robot=self.robot, forced_update=use_cheater_observer)
         if self.controller is not None:
-            self.controller.AddToBuilderAndConnect(builder, robot=self.robot, target=self.target, observer=self.observer)
+            if use_cheater_observer:
+                self.controller.AddToBuilderAndConnect(builder, robot=self.robot, target=self.target, observer=None)
+            else:
+                self.controller.AddToBuilderAndConnect(builder, robot=self.robot, target=self.target, observer=self.observer)
 
         self.diagram = builder.Build()
 
@@ -72,6 +75,8 @@ class WalkingSystem():
             if not ignore_error:
                 raise
         self.robot.ReplayRecording()
+        if self.observer is not None:
+            self.observer.ReplayRecording()
 
         return
     

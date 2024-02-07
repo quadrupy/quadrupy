@@ -89,6 +89,8 @@ class InekfObserver(WalkingObserver):
         # Initialize the visualizer
         if self.settings.add_visualizer:
             self.InitVisualizer()
+        else:
+            self.vis = None
 
                 
     def InitVisualizer(self):
@@ -97,7 +99,7 @@ class InekfObserver(WalkingObserver):
         # Get equivalent box for the torso
         body_spatial_inertia = self.robot.root_body.CalcSpatialInertiaInBodyFrame(self.robot.plant.CreateDefaultContext())
         body_principal_moments = body_spatial_inertia.Shift(body_spatial_inertia.get_com()).CalcRotationalInertia().CalcPrincipalMomentsAndAxesOfInertia()
-        A = 1/12*6.92*np.array([[0,1,1],[1,0,1],[1,1,0]])
+        A = 1/12*self.robot.root_body.default_mass()*np.array([[0,1,1],[1,0,1],[1,1,0]])
         box_lengths = np.sqrt(np.linalg.inv(A)@body_principal_moments[0])
         box_origin = RigidTransform(body_principal_moments[1],body_spatial_inertia.get_com())
         box_shape = Box(*box_lengths)
@@ -129,17 +131,26 @@ class InekfObserver(WalkingObserver):
         self.vis_ctx = self.vis.GetMyContextFromRoot(self.vis_diagram_ctx)
         self.vis_pos = self.vis_plant.GetDefaultPositions()
 
-    def UpdateVisualizer(self,body_position,foot_positions):
+        self.vis.StartRecording()
+
+    def UpdateVisualizer(self,body_position,foot_positions,t):
         self.vis_pos[:7] = body_position
         for i in range(self.robot.num_contacts):
             self.vis_pos[7*(i+1)+4:7*(i+2)] = foot_positions[i]
         self.vis_plant.SetPositions(self.vis_plant_ctx, self.vis_pos)
+        self.vis_diagram_ctx.SetTime(t)
         self.vis.ForcedPublish(self.vis_ctx)
+
+    def ReplayRecording(self):
+        if self.settings.add_visualizer:
+            self.vis.StopRecording()
+            self.vis.PublishRecording()
 
     def CalcOutput(self, context: Context, output: AbstractValue):
         sensor_data:SensorData = self.sensing_in.Eval(context)
         if np.linalg.norm(sensor_data.joint_pos) < 1e-6:
-            output.set_value(np.zeros(self.n_state))
+            if output is not None:
+                output.set_value(np.zeros(self.n_state))
             return
 
         plant_ctx = self.observer_context
@@ -190,9 +201,11 @@ class InekfObserver(WalkingObserver):
 
         if self.settings.add_visualizer:
             world_foot_pos =  [fp + [0., 0., -shift_height] for fp in world_foot_pos]
-            self.UpdateVisualizer(q[:7],foot_positions=world_foot_pos)
+            self.UpdateVisualizer(q[:7],foot_positions=world_foot_pos,t=sensor_data.time_stamp)
 
         self.prev_sensor_data.copy_from(sensor_data)
-        output.set_value(np.hstack([q,dq]))
+
+        if output is not None:   
+            output.set_value(np.hstack([q,dq]))
         return
 

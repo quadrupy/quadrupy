@@ -40,7 +40,7 @@ controller:
     Kd: 1.
 
   stance_params:
-    Kd: 1.
+    Kd: 2.0
 
   wbqp_params:
     mu: 0.5
@@ -69,5 +69,5 @@ observer:
 target:
   class_name: JoystickInput
   x_y_yaw_offset: [0.,0.,0.]
-  x_y_yaw_scale: [-1.0,-0.5,-1.5]
+  x_y_yaw_scale: [-1.0,-0.35,-1.5]
   alpha_filter: 0.9
