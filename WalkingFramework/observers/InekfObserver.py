@@ -188,7 +188,8 @@ class InekfObserver(WalkingObserver):
         imu_vel = self.inekf_filter.getState().getVelocity()
         root_vel = self.imu_to_root.rotation()@imu_vel
         imu_ang_vel = sensor_data.imu_ang_vel
-        root_ang_vel = self.imu_to_root.rotation()@imu_ang_vel
+        root_ang_vel_robot_frame = self.imu_to_root.rotation()@imu_ang_vel
+        root_ang_vel_world_frame = root_pos.rotation()@root_ang_vel_robot_frame
 
         # Shift the body height such that the lowest stance foot is at z = 0
         world_foot_pos = [imu_pos@RigidTransform(RotationMatrix(np.eye(3)),fp).translation() for fp in footPos]
@@ -196,7 +197,7 @@ class InekfObserver(WalkingObserver):
 
         q[:4] = root_pos.rotation().ToQuaternion().wxyz()
         q[4:7] = root_pos.translation() + [0., 0., -shift_height]
-        dq[:3] = root_ang_vel
+        dq[:3] = root_ang_vel_world_frame
         dq[3:6] = root_vel
 
         if self.settings.add_visualizer:
