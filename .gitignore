@@ -3,3 +3,4 @@
 _deps/
 .direnv/
 .envrc
+.DS_Store

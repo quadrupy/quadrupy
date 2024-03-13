@@ -2,10 +2,11 @@ cmake_minimum_required(VERSION 2.8.3)
 project(inekf_python_wrapper)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -DEIGEN_NO_DEBUG -march=native")
 
+
 find_package(Eigen3 REQUIRED)
 include_directories(${EIGEN3_INCLUDE_DIR})
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../third_party/inekf/include)
+# include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../third_party/inekf/include)
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib)
 
 # python
@@ -30,5 +31,13 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(inekf)
 target_include_directories(inekf PUBLIC ${inekf_SOURCE_DIR}/include)
 
-pybind11_add_module(inekf_py inekf_binding.cpp)
-target_link_libraries(inekf_py PRIVATE inekf)
+FetchContent_Declare(
+        unitree_interface
+        GIT_REPOSITORY https://github.com/akoen/unitree_sdk2
+        GIT_TAG main
+)
+FetchContent_MakeAvailable(unitree_interface)
+
+pybind11_add_module(inekf_py inekf_binding.cpp hardware_binding.cpp utils.cpp)
+target_link_libraries(inekf_py PRIVATE unitree_interface inekf)
+target_include_directories(inekf_py PRIVATE ${unitree_sdk2_SOURCE_DIR}/include)
