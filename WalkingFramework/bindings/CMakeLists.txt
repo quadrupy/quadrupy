@@ -38,6 +38,9 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(unitree_interface)
 
-pybind11_add_module(inekf_py inekf_binding.cpp hardware_binding.cpp)
+pybind11_add_module(inekf_py inekf_binding.cpp)
+pybind11_add_module(go2_py hardware_binding.cpp)
 target_link_libraries(inekf_py PRIVATE unitree_interface inekf)
 target_include_directories(inekf_py PRIVATE ${unitree_sdk2_SOURCE_DIR}/include)
+target_link_libraries(go2_py PRIVATE unitree_interface inekf)
+target_include_directories(go2_py PRIVATE ${unitree_sdk2_SOURCE_DIR}/include)

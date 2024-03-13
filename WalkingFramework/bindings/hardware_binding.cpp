@@ -28,7 +28,7 @@ namespace py = pybind11;
 
 PYBIND11_MAKE_OPAQUE(std::map<int, Eigen::Vector3d>);
 
-PYBIND11_MODULE(hardware_py, m) {
+PYBIND11_MODULE(go2_py, m) {
     // py::class_<LowCmd_>(m, "LowCmd_")
     //     .def(py::init<>())
     //     .def("head", &LowCmd_::head)
