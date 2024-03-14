@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quadrupy"
+version = "0.0.1"
+dependencies = ["drake", "numpy", "matplotlib", "pygame"]
+requires-python = ">=3.11"
+authors = [
+    { name = "Nils Smit-Anseeuw" },
+    { name = "Alex Koen" },
+    { name = "Chris Yoon" },
+    { name = "Mischa Johal" },
+    { name = "Serhii Rubtsov" },
+]

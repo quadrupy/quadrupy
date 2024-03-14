@@ -1,0 +1,4 @@
+drake
+numpy
+matplotlib
+pygame
