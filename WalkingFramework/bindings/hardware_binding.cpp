@@ -2,7 +2,7 @@
 #include "unitree/idl/go2/MotorCmd_.hpp"
 #include "unitree/robot/channel/channel_factory.hpp"
 #include "unitree/robot/go2/robot_state/robot_state_client.hpp"
-#include "utils.cpp"
+#include "util.cpp"
 #include <iostream>
 #include <unistd.h>
 #include <string.h>
