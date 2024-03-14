@@ -20,9 +20,14 @@ using namespace unitree::robot::go2;
 constexpr double PosStopF = (2.146E+9f);
 constexpr double VelStopF = (16000.0f);
 
+const int NUM_IMU_ACCEL = 3; // linear xyz
+const int NUM_FEET = 4; // quadraped
+const int NUM_JOINT_MOTORS = 12; // 20 total, but 12 used
+
 class Go2
 {
 public:
+
     explicit Go2(){}
     ~Go2(){}
 
@@ -33,6 +38,11 @@ public:
     void set_motor_cmd(std::vector<float> q, std::vector<float> dq, std::vector<float> kp, std::vector<float> kd, std::vector<float> tau);
     void set_crc();
     void write();
+    std::array<float, NUM_IMU_ACCEL> imu_accel();
+    std::array<int16_t, NUM_FEET> foot_force();
+    std::array<float, NUM_JOINT_MOTORS> q();
+    std::array<float, NUM_JOINT_MOTORS> dq();
+    std::array<float, NUM_JOINT_MOTORS> tau();
 private:
     void InitLowCmd();
     void LowStateMessageHandler(const void* messages);
@@ -46,7 +56,9 @@ private:
     int sin_count = 0;
     int motiontime = 0;
     float dt = 0.002; // 0.001~0.01
-
+    std::array<float, NUM_JOINT_MOTORS> q_;
+    std::array<float, NUM_JOINT_MOTORS> dq_;
+    std::array<float, NUM_JOINT_MOTORS> tau_;
     RobotStateClient rsc;
 
     unitree_go::msg::dds_::LowCmd_ low_cmd{};      // default init
@@ -206,6 +218,30 @@ void Go2::set_crc() {
 }
 void Go2::write() {
     lowcmd_publisher->Write(low_cmd);
+}
+std::array<float, NUM_IMU_ACCEL> Go2::imu_accel() {
+    return low_state.imu_state().accelerometer();
+}
+std::array<int16_t, NUM_FEET> Go2::foot_force() {
+    return low_state.foot_force();
+}
+std::array<float, NUM_JOINT_MOTORS> Go2::q() {
+    for (auto i=0; i<NUM_JOINT_MOTORS; ++i) {
+        q_[i] = low_state.motor_state()[i].q();
+    }
+    return q_;
+}
+std::array<float, NUM_JOINT_MOTORS> Go2::dq() {
+    for (auto i=0; i<NUM_JOINT_MOTORS; ++i) {
+        dq_[i] = low_state.motor_state()[i].dq();
+    }
+    return dq_;
+}
+std::array<float, NUM_JOINT_MOTORS> Go2::tau() {
+    for (auto i=0; i<NUM_JOINT_MOTORS; ++i) {
+        tau_[i] = low_state.motor_state()[i].tau_est();
+    }
+    return tau_;
 }
 void Go2::LowCmdWrite()
 {

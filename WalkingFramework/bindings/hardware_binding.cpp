@@ -60,5 +60,10 @@ PYBIND11_MODULE(go2_py, m) {
         .def("activate_service", &Go2::activateService)
         .def("set_motor_cmd", &Go2::set_motor_cmd)
         .def("set_crc", &Go2::set_crc)
-        .def("write", &Go2::write);
+        .def("write", &Go2::write)
+        .def("imu_accel", &Go2::imu_accel)
+        .def("foot_force", &Go2::foot_force)
+        .def("q", &Go2::q)
+        .def("dq", &Go2::dq)
+        .def("tau", &Go2::tau);
 }
