@@ -2,7 +2,7 @@
 #include "unitree/idl/go2/MotorCmd_.hpp"
 #include "unitree/robot/channel/channel_factory.hpp"
 #include "unitree/robot/go2/robot_state/robot_state_client.hpp"
-#include "util.cpp"
+#include "util.hpp"
 #include <iostream>
 #include <unistd.h>
 #include <string.h>
@@ -52,10 +52,13 @@ PYBIND11_MODULE(go2_py, m) {
     //     .def("init", &RobotStateClient::Init)
     //     .def("set_timeout", &RobotStateClient::SetTimeout);
     
-    py::class_<Custom>(m, "Custom")
+    py::class_<Go2>(m, "Go2")
         .def(py::init<>())
-        .def("init", &Custom::Init)
-        .def("init_robot_state_client", &Custom::InitRobotStateClient)
-        .def("query_service_status", &Custom::queryServiceStatus)
-        .def("activate_service", &Custom::activateService);
+        .def("init", &Go2::Init)
+        .def("init_robot_state_client", &Go2::InitRobotStateClient)
+        .def("query_service_status", &Go2::queryServiceStatus)
+        .def("activate_service", &Go2::activateService)
+        .def("set_motor_cmd", &Go2::set_motor_cmd)
+        .def("set_crc", &Go2::set_crc)
+        .def("write", &Go2::write);
 }

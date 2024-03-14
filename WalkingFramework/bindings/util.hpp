@@ -20,16 +20,19 @@ using namespace unitree::robot::go2;
 constexpr double PosStopF = (2.146E+9f);
 constexpr double VelStopF = (16000.0f);
 
-class Custom
+class Go2
 {
 public:
-    explicit Custom(){}
-    ~Custom(){}
+    explicit Go2(){}
+    ~Go2(){}
 
     void Init();
     void InitRobotStateClient();
     int queryServiceStatus(const std::string& serviceName);
     void activateService(const std::string& serviceName,int activate);
+    void set_motor_cmd(std::vector<float> q, std::vector<float> dq, std::vector<float> kp, std::vector<float> kd, std::vector<float> tau);
+    void set_crc();
+    void write();
 private:
     void InitLowCmd();
     void LowStateMessageHandler(const void* messages);
@@ -112,7 +115,7 @@ uint32_t crc32_core(uint32_t* ptr, uint32_t len)
     return CRC32;
 }
 
-void Custom::Init()
+void Go2::Init()
 {
     InitLowCmd();
 
@@ -122,13 +125,13 @@ void Custom::Init()
 
     /*create subscriber*/
     lowstate_subscriber.reset(new ChannelSubscriber<unitree_go::msg::dds_::LowState_>(TOPIC_LOWSTATE));
-    lowstate_subscriber->InitChannel(std::bind(&Custom::LowStateMessageHandler, this, std::placeholders::_1), 1);
+    lowstate_subscriber->InitChannel(std::bind(&Go2::LowStateMessageHandler, this, std::placeholders::_1), 1);
 
-    /*loop publishing thread*/
-    lowCmdWriteThreadPtr = CreateRecurrentThreadEx("writebasiccmd", UT_CPU_ID_NONE, 2000, &Custom::LowCmdWrite, this);
+    // /*loop publishing thread*/
+    // lowCmdWriteThreadPtr = CreateRecurrentThreadEx("writebasiccmd", UT_CPU_ID_NONE, 2000, &Go2::LowCmdWrite, this);
 }
 
-void Custom::InitLowCmd()
+void Go2::InitLowCmd()
 {
     low_cmd.head()[0] = 0xFE;
     low_cmd.head()[1] = 0xEF;
@@ -146,13 +149,13 @@ void Custom::InitLowCmd()
     }
 }
 
-void Custom::InitRobotStateClient()
+void Go2::InitRobotStateClient()
 {
     rsc.SetTimeout(10.0f); 
     rsc.Init();
 }
 
-int Custom::queryServiceStatus(const std::string& serviceName)
+int Go2::queryServiceStatus(const std::string& serviceName)
 {
     std::vector<ServiceState> serviceStateList;
     int ret,serviceStatus;
@@ -179,17 +182,32 @@ int Custom::queryServiceStatus(const std::string& serviceName)
     
 }
 
-void Custom::activateService(const std::string& serviceName,int activate)
+void Go2::activateService(const std::string& serviceName,int activate)
 {
     rsc.ServiceSwitch(serviceName, activate);  
 }
 
-void Custom::LowStateMessageHandler(const void* message)
+void Go2::LowStateMessageHandler(const void* message)
 {
     low_state = *(unitree_go::msg::dds_::LowState_*)message;
 }
 
-void Custom::LowCmdWrite()
+void Go2::set_motor_cmd(std::vector<float> q, std::vector<float> dq, std::vector<float> kp, std::vector<float> kd, std::vector<float> tau) {
+    for (auto i = 0; i < 12; ++i) {
+        low_cmd.motor_cmd()[i].q() = q[i];
+        low_cmd.motor_cmd()[i].dq() = dq[i];
+        low_cmd.motor_cmd()[i].kp() = kp[i];
+        low_cmd.motor_cmd()[i].kd() = kd[i];
+        low_cmd.motor_cmd()[i].tau() = tau[i];
+    }
+}
+void Go2::set_crc() {
+    low_cmd.crc() = crc32_core((uint32_t *)&low_cmd, (sizeof(unitree_go::msg::dds_::LowCmd_)>>2)-1);
+}
+void Go2::write() {
+    lowcmd_publisher->Write(low_cmd);
+}
+void Go2::LowCmdWrite()
 {
     if(_percent_4<1)
     {
@@ -275,7 +293,6 @@ void Custom::LowCmdWrite()
             }
         }
         low_cmd.crc() = crc32_core((uint32_t *)&low_cmd, (sizeof(unitree_go::msg::dds_::LowCmd_)>>2)-1);
-    
         lowcmd_publisher->Write(low_cmd);
     }
    
