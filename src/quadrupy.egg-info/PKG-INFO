@@ -1,9 +1,0 @@
-Metadata-Version: 2.1
-Name: quadrupy
-Version: 0.0.1
-Author: Nils Smit-Anseeuw, Alex Koen, Chris Yoon, Mischa Johal, Serhii Rubtsov
-Requires-Python: >=3.11
-Requires-Dist: drake
-Requires-Dist: numpy
-Requires-Dist: matplotlib
-Requires-Dist: pygame
