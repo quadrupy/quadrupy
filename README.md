@@ -1,20 +1,14 @@
-# ObserverDesign
+# Quadrupy
 
 ## Install
-Recommend using a venv with python 3.8. Run:
+Recommend using a venv with python 3.11. Run:
 ```
-pip install --upgrade pip
-pip install -r requirements.txt
+pip install -e .
 ```
-
-To learn more about drake, check out the documentation [here](https://drake.mit.edu/pydrake/index.html)
 
 To compile the bindings for the third party C++ libraries:
 ```
-sudo apt install libeigen3-dev
-cd WalkingFramework/bindings
-cmake .
-make all
+make bindings
 ```
 
 ## Run 
