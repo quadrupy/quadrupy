@@ -39,6 +39,7 @@ public:
     void set_crc();
     void write();
     std::array<float, NUM_IMU_ACCEL> imu_accel();
+    std::array<float, NUM_IMU_ACCEL> imu_ang_vel();
     std::array<int16_t, NUM_FEET> foot_force();
     std::array<float, NUM_JOINT_MOTORS> q();
     std::array<float, NUM_JOINT_MOTORS> dq();
@@ -221,6 +222,9 @@ void Go2::write() {
 }
 std::array<float, NUM_IMU_ACCEL> Go2::imu_accel() {
     return low_state.imu_state().accelerometer();
+}
+std::array<float, NUM_IMU_ACCEL> Go2::imu_ang_vel() {
+    return low_state.imu_state().gyroscope();
 }
 std::array<int16_t, NUM_FEET> Go2::foot_force() {
     return low_state.foot_force();

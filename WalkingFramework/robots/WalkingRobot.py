@@ -6,6 +6,8 @@ from pydrake.systems.analysis import Simulator
 from pydrake.geometry import GeometryId, SceneGraph, Meshcat, MeshcatVisualizer, Role, MeshcatVisualizerParams
 from pydrake.math import RotationMatrix
 import numpy as np
+import time
+from ..bindings.lib import go2_py as go2
 
 class LLCActuationCommand():
     # Low-level controller actuation command. This is the input to the low level controllers on the robot
@@ -108,6 +110,10 @@ class WalkingRobot(LeafSystem):
         self.sensing_data = SensorData(reference_plant.num_actuators(),self.num_contacts)
         self.cheater_state = np.zeros(reference_plant.num_multibody_states())
 
+        # hardware specific
+        self.hardware_robot = go2.Go2()
+        self.FOOT_FORCE_THRES = 10
+
         nodep = set([self.time_ticket()])
         
         self.DeclarePeriodicUnrestrictedUpdateEvent(dt,0.0,self.PeriodicUpdate)
@@ -130,7 +136,15 @@ class WalkingRobot(LeafSystem):
             builder.AddSystem(self.sim_llc)
             builder.Connect(reference_plant.get_state_output_port(), self.sim_llc.state_in)
             builder.Connect(self.sim_llc.torque_out, reference_plant.get_actuation_input_port())
-
+        else:
+            # initialize hardware robot
+            go2.ChannelFactory.instantce_init("") # network interface
+            self.hardware_robot.init_robot_state_client()
+            while (self.hardware_robot.query_service_status("sport_mode")):
+                print("Trying to deactivate sport_mode service")
+                self.hardware_robot.activate_service("sport_mode", 0)
+                time.sleep(1)
+            self.hardware_robot.init() # create pub, sub
         self.plant_diagram = builder.Build()
 
         self.meshcat_vis.StartRecording()
@@ -199,8 +213,24 @@ class WalkingRobot(LeafSystem):
         self.meshcat_vis.PublishRecording()
 
     def HardwareUpdate(self):
-        # Send actuation commands to the robot and receive sensing data
-        raise NotImplementedError
+        # Send actuation commands to the robot
+        # similar to LowCmdWrite
+
+        # body_accelerations = self.hardware_robot.imu_accel()
+        # body_velocities = self.hardware_robot.dq()
+        # foot_force = self.hardware_robot.foot_force()
+
+        # calc sensor data
+        self.sensing_data.joint_pos = self.hardware_robot.q()
+        self.sensing_data.joint_vel = self.hardware_robot.dq()
+        self.sensing_data.joint_torque = self.hardware_robot.tau()
+        self.sensing_data.imu_acc = self.hardware_robot.imu_accel()
+        self.sensing_data.imu_ang_vel = self.hardware_robot.imu_ang_vel()
+        self.sensing_data.contact_state = np.zeros(self.num_contacts)
+        self.sensing_data.contact_state = np.where(self.hardware_robot.foot_force() <= self.FOOT_FORCE_THRES, 0, 1)
+        self.sensing_data.time_stamp = self.vis_ctx.get_time()
+        print(vars(self.sensing_data))
+        return
     
     def CalcSensing(self,context: Context,output: AbstractValue):
         output.set_value(self.sensing_data)
