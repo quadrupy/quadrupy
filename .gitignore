@@ -6,7 +6,7 @@ _deps/
 .DS_Store
 build/
 lib/
-
+venv/
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
