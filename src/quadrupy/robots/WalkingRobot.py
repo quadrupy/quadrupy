@@ -110,8 +110,6 @@ class WalkingRobot(LeafSystem):
         self.sensing_data = SensorData(reference_plant.num_actuators(),self.num_contacts)
         self.cheater_state = np.zeros(reference_plant.num_multibody_states())
 
-        self.FOOT_FORCE_THRES = 10
-
         nodep = set([self.time_ticket()])
         
         self.DeclarePeriodicUnrestrictedUpdateEvent(dt,0.0,self.PeriodicUpdate)
@@ -147,26 +145,28 @@ class WalkingRobot(LeafSystem):
         self.plant_diagram = builder.Build()
 
         self.meshcat_vis.StartRecording()
-        # if is_sim:
-        # Create the internal simulator
-        self.simulator = Simulator(self.plant_diagram)
-        self.simulator.Initialize()
-        self.simulator.set_publish_every_time_step(True)
-        self.simulator.AdvanceTo(0.0)
-        self.sim_ctx = self.simulator.get_context()
-        self.sim_plant_ctx = self.plant.GetMyContextFromRoot(self.sim_ctx)
-        self.vis_ctx = self.meshcat_vis.GetMyContextFromRoot(self.sim_ctx)
-        if sim_initial_state is not None:
-            self.plant.SetPositions(self.sim_plant_ctx,sim_initial_state)
-
+        if is_sim:
+            # Create the internal simulator
+            self.simulator = Simulator(self.plant_diagram)
+            self.simulator.Initialize()
+            self.simulator.set_publish_every_time_step(True)
+            self.simulator.AdvanceTo(0.0)
+            self.sim_ctx = self.simulator.get_context()
+            self.sim_plant_ctx = self.plant.GetMyContextFromRoot(self.sim_ctx)
+            self.vis_ctx = self.meshcat_vis.GetMyContextFromRoot(self.sim_ctx)
+            if sim_initial_state is not None:
+                self.plant.SetPositions(self.sim_plant_ctx,sim_initial_state)
+        else:
+            self.last_timestamp = 0
+            
     def PeriodicUpdate(self,context: Context, output: AbstractValue):
         # This function is responsible for sending motor commands to the simulator/robot and filling in the sensing data
         self.actuation_data.copy_from(self.llc_actuation_in.Eval(context))
         if self.is_sim:
             self.SimUpdate()
+            self.meshcat_vis.ForcedPublish(self.vis_ctx)
         else:
             self.HardwareUpdate()
-        self.meshcat_vis.ForcedPublish(self.vis_ctx)
 
     def SimUpdate(self):
         # Send actuation commands to the simulator
@@ -198,7 +198,6 @@ class WalkingRobot(LeafSystem):
                     self.sensing_data.contact_state[j] = 1
         self.sensing_data.time_stamp = self.sim_ctx.get_time()
         self.cheater_state = self.plant.GetPositionsAndVelocities(self.sim_plant_ctx)
-
         return
 
     def ReplayRecording(self):

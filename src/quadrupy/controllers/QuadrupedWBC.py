@@ -11,9 +11,9 @@ from pydrake.common.eigen_geometry import Quaternion, AngleAxis
 import numpy as np
 import time
 
-from .WalkingController import WalkingController, WorldToRobotCoordinates
-from ..robots.WalkingRobot import WalkingRobot
-from ..targets.WalkingTarget import WalkingTargetValue
+from quadrupy.controllers.WalkingController import WalkingController, WorldToRobotCoordinates
+from quadrupy.robots.WalkingRobot import WalkingRobot
+from quadrupy.targets.WalkingTarget import WalkingTargetValue
 
 class QuadrupedWBCSettings():
     def __init__(self,  des_height = 1,

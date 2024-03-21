@@ -5,6 +5,7 @@ from pydrake.systems.framework import DiagramBuilder
 from pydrake.math import RigidTransform, RotationMatrix
 from pydrake.geometry import HalfSpace, Box
 
+import time
 import numpy as np
 import os
 
@@ -18,7 +19,7 @@ class Go2RobotSettings():
     
     def OverwriteFromDict(self, config_dict:dict):
         if config_dict.__contains__('friction'):
-            self.friction = config_dict['friction']
+            self.friction = config_dict['friction'] 
         if config_dict.__contains__('llc_dt'):
             self.llc_dt = config_dict['llc_dt']
         if config_dict.__contains__('controller_dt'):
@@ -80,13 +81,18 @@ class Go2Robot(WalkingRobot):
         # Useful variables for IK
         self.foot_names = ['FL','FR','RL','RR']
         self.shoulder_positions = np.array([[sign[0]*0.1934, sign[1]*0.0465, 0.] for sign in [[1,1],[1,-1],[-1,1],[-1,-1]]]) # note left is positive y
-        self.jps = []
-        self.jvs = []
-        self.jts = []
-        self.ias = []
-        self.iavs = []
-        self.cs = []
+        
+        self.FOOT_FORCE_THRES = 21
 
+        # to save for plotting purposes
+        self.joint_pos = []
+        self.joint_vels = []
+        self.jts = []
+        self.imu_accels = []
+        self.iavs = []
+        self.contact_states = []
+
+        # stand example
         self.is_first_run = True
         self.duration_1 = 500
         self.duration_2 = 500
@@ -100,7 +106,6 @@ class Go2Robot(WalkingRobot):
         self.target_pos_2 = [0.0, 0.67, -1.3, 0.0, 0.67, -1.3, 0.0, 0.67, -1.3, 0.0, 0.67, -1.3]
         self.target_pos_3 = [-0.35, 1.36, -2.65, 0.35, 1.36, -2.65, -0.5, 1.36, -2.65, 0.5, 1.36, -2.65]
         self.done = False
-        
         self.kp = 60.0
         self.kd = 5.0
         self.time_consume = 0
@@ -108,11 +113,9 @@ class Go2Robot(WalkingRobot):
         self.sin_count = 0
         self.motion_time = 0
         self.dt = 0.002
-
         self.start_pos = [0]*12
-    def HardwareUpdate(self):
-        # Advance simulator by controller dt
-        self.simulator.AdvanceTo(self.sim_ctx.get_time()+self.dt)
+
+    def stand_ex(self):
         if self.done:
             return
         if self.percent_4 == 1:
@@ -191,20 +194,34 @@ class Go2Robot(WalkingRobot):
                 self.hardware_robot.set_motor_cmd(q, dq, kp, kd, tau)
             self.hardware_robot.set_crc()
             self.hardware_robot.write()
+                        
+    def HardwareUpdate(self):
+            # Advance simulator by controller dt
+        # self.simulator.AdvanceTo(self.sim_ctx.get_time()+self.dt)
+
+        # Send actuation commands to the robot
+        self.hardware_robot.set_motor_cmd(list(self.actuation_data.q), list(self.actuation_data.dq), list(self.actuation_data.Kp), list(self.actuation_data.Kd), list(self.actuation_data.tau))
+        self.hardware_robot.set_crc()
+        self.hardware_robot.write()
+
+        # set sensing data
         self.sensing_data.joint_pos = self.hardware_robot.q()
         self.sensing_data.joint_vel = self.hardware_robot.dq()
         self.sensing_data.joint_torque = self.hardware_robot.tau()
         self.sensing_data.imu_acc = self.hardware_robot.imu_accel()
         self.sensing_data.imu_ang_vel = self.hardware_robot.imu_ang_vel()
-        # self.sensing_data.contact_state = np.zeros(self.num_contacts)
         self.sensing_data.contact_state = self.hardware_robot.foot_force()
-        # self.sensing_data.time_stamp = self.vis_ctx.get_time()
-        self.sensing_data.time_stamp = self.sim_ctx.get_time()
+        for i in range(0, self.num_contacts):
+            self.sensing_data.contact_state[i] = 1 if self.sensing_data.contact_state[i] >= self.FOOT_FORCE_THRES else 0
+        if self.last_timestamp == 0:
+            self.last_timestamp = 0
+        else:
+            self.last_timestamp = time.time() - self.last_timestamp
 
-        self.ias.append(self.sensing_data.imu_acc)
+        # for plotting
+        self.imu_accels.append(self.sensing_data.imu_acc)
         self.iavs.append(self.sensing_data.imu_ang_vel)
-        self.cs.append(self.sensing_data.contact_state)
-        # print(vars(self.sensing_data))
+        self.contact_states.append(self.sensing_data.contact_state)
 
     def GetShoulderPosition(self, foot_idx: int) -> np.array:
         return self.shoulder_positions[foot_idx]
