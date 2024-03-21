@@ -113,26 +113,29 @@ class QuadrupedWBC(WalkingController):
         self.wbqp_four_contact = WholeBodyQP(robot,self.settings.wbqp_targets_stand,self.settings.wbqp_params,n_contact=4)
 
         self.killed = False
+        self.t0 = time.time()
 
         return
 
     def CalcOutput(self, context: Context, output: AbstractValue):
         # Get controller inputs
-        t = context.get_time()
+        t = time.time() - self.t0
         qv_world = self.state_in.Eval(context)
         target_in:WalkingTargetValue = self.target_in.Eval(context)
 
+        print(np.max(np.abs(qv_world[7:self.nq])))
+        # Convert robot state to body coordinates
+        if np.linalg.norm(qv_world) < 1e-6:
+            # If the quaternion is zero, the robot is not initialized. Return zero torques
+            return super().CalcOutput(context, output)
+        robot_rot = RollPitchYaw(Quaternion(qv_world[:4]))
         # Pull out target values
-        if target_in.kill:
+        if abs(robot_rot.roll_angle())>np.pi/4 or abs(robot_rot.pitch_angle())>np.pi/4 or np.any(np.abs(qv_world[7:self.nq])>3) or target_in.kill:
             raise RuntimeError('Controller killed')
         des_xy_vel = target_in.des_x_y_yaw_vel[:2]
         des_yaw_vel = target_in.des_x_y_yaw_vel[2]
         start_stop = target_in.start_stop_stepping
 
-        # Convert robot state to body coordinates
-        if np.linalg.norm(qv_world) < 1e-6:
-            # If the quaternion is zero, the robot is not initialized. Return zero torques
-            return super().CalcOutput(context, output)
         qv_robot = WorldToRobotCoordinates(qv_world,self.nq)
         self.robot.plant.SetPositionsAndVelocities(self.controller_context,qv_robot)
 
@@ -201,7 +204,7 @@ class QuadrupedWBC(WalkingController):
             idx = self.leg_joint_indices[f]
             self.actuation_data.q[idx] = 0.0
             self.actuation_data.Kp[idx] = 0.0
-            self.actuation_data.dq[idx] = des_stance_joint_vel[i]
+            self.actuation_data.dq[idx] = 0*des_stance_joint_vel[i]
             self.actuation_data.Kd[idx] = self.settings.stance_params['Kd']
             self.actuation_data.tau[idx] = desired_tau[idx]
         for i,f in enumerate(swing_feet):

@@ -82,14 +82,14 @@ class Go2Robot(WalkingRobot):
         self.foot_names = ['FL','FR','RL','RR']
         self.shoulder_positions = np.array([[sign[0]*0.1934, sign[1]*0.0465, 0.] for sign in [[1,1],[1,-1],[-1,1],[-1,-1]]]) # note left is positive y
         
-        self.FOOT_FORCE_THRES = 21
+        self.FOOT_FORCE_THRES = 25
 
         # to save for plotting purposes
         self.joint_pos = []
         self.joint_vels = []
-        self.jts = []
+        self.joint_torques = []
         self.imu_accels = []
-        self.iavs = []
+        self.imu_ang_vels = []
         self.contact_states = []
 
         # stand example
@@ -114,6 +114,7 @@ class Go2Robot(WalkingRobot):
         self.motion_time = 0
         self.dt = 0.002
         self.start_pos = [0]*12
+        self.t0 = time.time()
 
     def stand_ex(self):
         if self.done:
@@ -194,13 +195,26 @@ class Go2Robot(WalkingRobot):
                 self.hardware_robot.set_motor_cmd(q, dq, kp, kd, tau)
             self.hardware_robot.set_crc()
             self.hardware_robot.write()
-                        
+
     def HardwareUpdate(self):
             # Advance simulator by controller dt
         # self.simulator.AdvanceTo(self.sim_ctx.get_time()+self.dt)
-
+        target_pos = self.plant.GetDefaultPositions()[7:]
         # Send actuation commands to the robot
-        self.hardware_robot.set_motor_cmd(list(self.actuation_data.q), list(self.actuation_data.dq), list(self.actuation_data.Kp), list(self.actuation_data.Kd), list(self.actuation_data.tau))
+        # target_pos[0] /= 2
+        # target_pos[1] /= 2
+        # target_pos[2] /= 2 
+        t = time.time()
+        if t-self.t0 < 10:
+            kp = min(60, 6*(t-self.t0))
+            self.hardware_robot.set_motor_cmd(list(target_pos), [0]*12, [kp]*12, [5]*12, [0]*12)
+            self.sensing_data.contact_state = [1]*4
+            print("standby")
+        else:
+            self.hardware_robot.set_motor_cmd(list(self.actuation_data.q), list(self.actuation_data.dq), list(self.actuation_data.Kp), list(self.actuation_data.Kd), list(self.actuation_data.tau))
+            self.sensing_data.contact_state = self.hardware_robot.foot_force()
+            for i in range(0, self.num_contacts):
+                self.sensing_data.contact_state[i] = 1 if self.sensing_data.contact_state[i] >= self.FOOT_FORCE_THRES else 0
         self.hardware_robot.set_crc()
         self.hardware_robot.write()
 
@@ -210,17 +224,13 @@ class Go2Robot(WalkingRobot):
         self.sensing_data.joint_torque = self.hardware_robot.tau()
         self.sensing_data.imu_acc = self.hardware_robot.imu_accel()
         self.sensing_data.imu_ang_vel = self.hardware_robot.imu_ang_vel()
-        self.sensing_data.contact_state = self.hardware_robot.foot_force()
-        for i in range(0, self.num_contacts):
-            self.sensing_data.contact_state[i] = 1 if self.sensing_data.contact_state[i] >= self.FOOT_FORCE_THRES else 0
-        if self.last_timestamp == 0:
-            self.last_timestamp = 0
-        else:
-            self.last_timestamp = time.time() - self.last_timestamp
-
+        self.sensing_data.time_stamp = time.time() - self.t0
+        # self.sensing_data.time_stamp = 0
+        # print(vars(self.actuation_data))
+        # print(self.sensing_data.time_stamp)
         # for plotting
         self.imu_accels.append(self.sensing_data.imu_acc)
-        self.iavs.append(self.sensing_data.imu_ang_vel)
+        self.imu_ang_vels.append(self.sensing_data.imu_ang_vel)
         self.contact_states.append(self.sensing_data.contact_state)
 
     def GetShoulderPosition(self, foot_idx: int) -> np.array:

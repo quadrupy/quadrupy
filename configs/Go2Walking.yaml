@@ -12,7 +12,7 @@ controller:
     step_height: 0.05
 
   raibert_params:
-    step_kd: [0.05,0.05]
+    step_kd: [0.05,0.1]
     step_clip: [0.5,0.5]
 
   wbqp_targets_stand:

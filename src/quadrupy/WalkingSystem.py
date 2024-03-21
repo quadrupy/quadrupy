@@ -68,11 +68,11 @@ class WalkingSystem():
         simulator = Simulator(self.diagram)
         simulator.Initialize()
         simulator.set_target_realtime_rate(target_rate)
-        # try:
-        simulator.AdvanceTo(t_end)
-        # except:
-            # if not ignore_error:
-            #     raise
+        try:
+            simulator.AdvanceTo(t_end)
+        except:
+            if not ignore_error:
+                raise
         self.robot.ReplayRecording()
         if self.observer is not None:
             self.observer.ReplayRecording()

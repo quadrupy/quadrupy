@@ -62,6 +62,8 @@ private:
     std::array<float, NUM_JOINT_MOTORS> tau_;
     RobotStateClient rsc;
 
+    std::vector<int> order_fix = {3, 4, 5, 0, 1, 2, 9, 10, 11, 6, 7, 8};
+
     unitree_go::msg::dds_::LowCmd_ low_cmd{};      // default init
     unitree_go::msg::dds_::LowState_ low_state{};  // default init
 
@@ -207,11 +209,12 @@ void Go2::LowStateMessageHandler(const void* message)
 
 void Go2::set_motor_cmd(std::vector<float> q, std::vector<float> dq, std::vector<float> kp, std::vector<float> kd, std::vector<float> tau) {
     for (auto i = 0; i < 12; ++i) {
-        low_cmd.motor_cmd()[i].q() = q[i];
-        low_cmd.motor_cmd()[i].dq() = dq[i];
-        low_cmd.motor_cmd()[i].kp() = kp[i];
-        low_cmd.motor_cmd()[i].kd() = kd[i];
-        low_cmd.motor_cmd()[i].tau() = tau[i];
+        int index = order_fix[i];
+        low_cmd.motor_cmd()[i].q() = q[index];
+        low_cmd.motor_cmd()[i].dq() = dq[index];
+        low_cmd.motor_cmd()[i].kp() = kp[index];
+        low_cmd.motor_cmd()[i].kd() = kd[index];
+        low_cmd.motor_cmd()[i].tau() = tau[index];
     }
 }
 void Go2::set_crc() {
@@ -227,23 +230,28 @@ std::array<float, NUM_IMU_ACCEL> Go2::imu_ang_vel() {
     return low_state.imu_state().gyroscope();
 }
 std::array<int16_t, NUM_FEET> Go2::foot_force() {
-    return low_state.foot_force();
+    std::array<int16_t, NUM_FEET> ff;
+    ff[0] = low_state.foot_force()[1];
+    ff[1] = low_state.foot_force()[0];
+    ff[2] = low_state.foot_force()[3];
+    ff[3] = low_state.foot_force()[2];
+    return ff;
 }
 std::array<float, NUM_JOINT_MOTORS> Go2::q() {
     for (auto i=0; i<NUM_JOINT_MOTORS; ++i) {
-        q_[i] = low_state.motor_state()[i].q();
+        q_[order_fix[i]] = low_state.motor_state()[i].q();
     }
     return q_;
 }
 std::array<float, NUM_JOINT_MOTORS> Go2::dq() {
     for (auto i=0; i<NUM_JOINT_MOTORS; ++i) {
-        dq_[i] = low_state.motor_state()[i].dq();
+        dq_[order_fix[i]] = low_state.motor_state()[i].dq();
     }
     return dq_;
 }
 std::array<float, NUM_JOINT_MOTORS> Go2::tau() {
     for (auto i=0; i<NUM_JOINT_MOTORS; ++i) {
-        tau_[i] = low_state.motor_state()[i].tau_est();
+        tau_[order_fix[i]] = low_state.motor_state()[i].tau_est();
     }
     return tau_;
 }
