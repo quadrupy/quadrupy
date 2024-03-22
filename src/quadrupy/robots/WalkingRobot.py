@@ -6,6 +6,8 @@ from pydrake.systems.analysis import Simulator
 from pydrake.geometry import GeometryId, SceneGraph, Meshcat, MeshcatVisualizer, Role, MeshcatVisualizerParams
 from pydrake.math import RotationMatrix
 import numpy as np
+import time
+from quadrupy.bindings.lib import go2_py as go2
 
 class LLCActuationCommand():
     # Low-level controller actuation command. This is the input to the low level controllers on the robot
@@ -130,7 +132,16 @@ class WalkingRobot(LeafSystem):
             builder.AddSystem(self.sim_llc)
             builder.Connect(reference_plant.get_state_output_port(), self.sim_llc.state_in)
             builder.Connect(self.sim_llc.torque_out, reference_plant.get_actuation_input_port())
-
+        else:
+            # initialize hardware robot
+            go2.ChannelFactory.instance_init("eno2") # network interface
+            self.hardware_robot = go2.Go2()
+            self.hardware_robot.init_robot_state_client()
+            while (self.hardware_robot.query_service_status("sport_mode")):
+                print("Trying to deactivate sport_mode service")
+                self.hardware_robot.activate_service("sport_mode", 0)
+                time.sleep(1)
+            self.hardware_robot.init() # create pub, sub
         self.plant_diagram = builder.Build()
 
         self.meshcat_vis.StartRecording()
@@ -146,19 +157,16 @@ class WalkingRobot(LeafSystem):
             if sim_initial_state is not None:
                 self.plant.SetPositions(self.sim_plant_ctx,sim_initial_state)
         else:
-            self.vis_ctx = self.meshcat_vis.CreateDefaultContext()
-
-
+            self.last_timestamp = 0
+            
     def PeriodicUpdate(self,context: Context, output: AbstractValue):
         # This function is responsible for sending motor commands to the simulator/robot and filling in the sensing data
         self.actuation_data.copy_from(self.llc_actuation_in.Eval(context))
-        
         if self.is_sim:
             self.SimUpdate()
+            self.meshcat_vis.ForcedPublish(self.vis_ctx)
         else:
             self.HardwareUpdate()
-
-        self.meshcat_vis.ForcedPublish(self.vis_ctx)
 
     def SimUpdate(self):
         # Send actuation commands to the simulator
@@ -189,18 +197,15 @@ class WalkingRobot(LeafSystem):
                 if bi == ppci.bodyA_index() or bi == ppci.bodyB_index():
                     self.sensing_data.contact_state[j] = 1
         self.sensing_data.time_stamp = self.sim_ctx.get_time()
-
         self.cheater_state = self.plant.GetPositionsAndVelocities(self.sim_plant_ctx)
-
         return
 
     def ReplayRecording(self):
         # self.meshcat_vis.StopRecording()
         self.meshcat_vis.PublishRecording()
 
-    def HardwareUpdate(self):
-        # Send actuation commands to the robot and receive sensing data
-        raise NotImplementedError
+    def HardwareUpdate(self):        
+        return
     
     def CalcSensing(self,context: Context,output: AbstractValue):
         output.set_value(self.sensing_data)

@@ -5,6 +5,7 @@ from pydrake.systems.framework import DiagramBuilder
 from pydrake.math import RigidTransform, RotationMatrix
 from pydrake.geometry import HalfSpace, Box
 
+import time
 import numpy as np
 import os
 
@@ -18,7 +19,7 @@ class Go2RobotSettings():
     
     def OverwriteFromDict(self, config_dict:dict):
         if config_dict.__contains__('friction'):
-            self.friction = config_dict['friction']
+            self.friction = config_dict['friction'] 
         if config_dict.__contains__('llc_dt'):
             self.llc_dt = config_dict['llc_dt']
         if config_dict.__contains__('controller_dt'):
@@ -75,16 +76,163 @@ class Go2Robot(WalkingRobot):
                     (plant.GetFrameByName("FR_foot"),np.zeros([1,3]),plant.GetCollisionGeometriesForBody(plant.GetBodyByName("FR_foot"))),
                     (plant.GetFrameByName("RL_foot"),np.zeros([1,3]),plant.GetCollisionGeometriesForBody(plant.GetBodyByName("RL_foot"))),
                     (plant.GetFrameByName("RR_foot"),np.zeros([1,3]),plant.GetCollisionGeometriesForBody(plant.GetBodyByName("RR_foot")))]
-        
         WalkingRobot.__init__(self,builder,plant,scene_graph,imu_body,root_body,contacts,actuation_limits,dt=self.settings.controller_dt,is_sim=is_sim)
         
         # Useful variables for IK
         self.foot_names = ['FL','FR','RL','RR']
         self.shoulder_positions = np.array([[sign[0]*0.1934, sign[1]*0.0465, 0.] for sign in [[1,1],[1,-1],[-1,1],[-1,-1]]]) # note left is positive y
         
+        self.FOOT_FORCE_THRES = 25
+
+        # to save for plotting purposes
+        self.joint_pos = []
+        self.joint_vels = []
+        self.joint_torques = []
+        self.imu_accels = []
+        self.imu_ang_vels = []
+        self.contact_states = []
+
+        # stand example
+        self.is_first_run = True
+        self.duration_1 = 500
+        self.duration_2 = 500
+        self.duration_3 = 1000
+        self.duration_4 = 900
+        self.percent_1 = 0
+        self.percent_2 = 0
+        self.percent_3 = 0
+        self.percent_4 = 0
+        self.target_pos_1 = [0.0, 1.36, -2.65, 0.0, 1.36, -2.65, -0.2, 1.36, -2.65, 0.2, 1.36, -2.65]
+        self.target_pos_2 = [0.0, 0.67, -1.3, 0.0, 0.67, -1.3, 0.0, 0.67, -1.3, 0.0, 0.67, -1.3]
+        self.target_pos_3 = [-0.35, 1.36, -2.65, 0.35, 1.36, -2.65, -0.5, 1.36, -2.65, 0.5, 1.36, -2.65]
+        self.done = False
+        self.kp = 60.0
+        self.kd = 5.0
+        self.time_consume = 0
+        self.rate_count = 0
+        self.sin_count = 0
+        self.motion_time = 0
+        self.dt = 0.002
+        self.start_pos = [0]*12
+        self.t0 = time.time()
+
+    def stand_ex(self):
+        if self.done:
+            return
+        if self.percent_4 == 1:
+            print("Finished example")
+            self.done = True
+            return
+        self.motion_time += 1
+        if self.motion_time >= 500:
+            if (self.is_first_run):
+                for i in range(0, 12):
+                    self.start_pos = np.array(self.hardware_robot.q())
+                self.is_first_run = False
+            if self.percent_1 < 1:
+                self.percent_1 += 1/self.duration_1
+                if self.percent_1 > 1:
+                    self.percent_1 = 1
+                q = [0]*12
+                dq = [0]*12
+                kp = [0]*12
+                kd = [0]*12
+                tau = [0]*12
+                for i in range(0, 12):
+                    q[i] = (1-self.percent_1)*self.start_pos[i] + self.percent_1*self.target_pos_1[i]
+                    dq[i] = 0
+                    kp[i] = self.kp
+                    kd[i] = self.kd
+                    tau[i] = 0
+                self.hardware_robot.set_motor_cmd(q, dq, kp, kd, tau)
+            if self.percent_1 == 1 and self.percent_2 < 1:
+                self.percent_2 += 1/self.duration_2
+                if self.percent_2 > 1:
+                    self.percent_2 = 1
+                q = [0]*12
+                dq = [0]*12
+                kp = [0]*12
+                kd = [0]*12
+                tau = [0]*12
+                for i in range(0, 12):
+                    q[i] = (1-self.percent_2)*self.target_pos_1[i] + self.percent_2*self.target_pos_2[i]
+                    dq[i] = 0
+                    kp[i] = self.kp
+                    kd[i] = self.kd
+                    tau[i] = 0
+                self.hardware_robot.set_motor_cmd(q, dq, kp, kd, tau)
+            if self.percent_1 == 1 and self.percent_2 == 1 and self.percent_3 < 1:
+                self.percent_3 += 1/self.duration_3
+                if self.percent_3 > 1:
+                    self.percent_3 = 1
+                q = [0]*12
+                dq = [0]*12
+                kp = [0]*12
+                kd = [0]*12
+                tau = [0]*12
+                for i in range(0, 12):
+                    q[i] = self.target_pos_2[i]
+                    dq[i] = 0
+                    kp[i] = self.kp
+                    kd[i] = self.kd
+                    tau[i] = 0
+                self.hardware_robot.set_motor_cmd(q, dq, kp, kd, tau)
+            if self.percent_1 == 1 and self.percent_2 == 1 and self.percent_3 == 1 and self.percent_4 < 1:
+                self.percent_4 += 1/self.duration_4
+                if self.percent_4 > 1:
+                    self.percent_4 = 1
+                q = [0]*12
+                dq = [0]*12
+                kp = [0]*12
+                kd = [0]*12
+                tau = [0]*12
+                for i in range(0, 12):
+                    q[i] = (1 - self.percent_4) * self.target_pos_2[i] + self.percent_4 * self.target_pos_3[i]
+                    dq[i] = 0
+                    kp[i] = self.kp
+                    kd[i] = self.kd
+                    tau[i] = 0
+                self.hardware_robot.set_motor_cmd(q, dq, kp, kd, tau)
+            self.hardware_robot.set_crc()
+            self.hardware_robot.write()
+
     def HardwareUpdate(self):
-        raise NotImplementedError
-    
+            # Advance simulator by controller dt
+        # self.simulator.AdvanceTo(self.sim_ctx.get_time()+self.dt)
+        target_pos = self.plant.GetDefaultPositions()[7:]
+        # Send actuation commands to the robot
+        # target_pos[0] /= 2
+        # target_pos[1] /= 2
+        # target_pos[2] /= 2 
+        t = time.time()
+        if t-self.t0 < 10:
+            kp = min(60, 6*(t-self.t0))
+            self.hardware_robot.set_motor_cmd(list(target_pos), [0]*12, [kp]*12, [5]*12, [0]*12)
+            self.sensing_data.contact_state = [1]*4
+            print("standby")
+        else:
+            self.hardware_robot.set_motor_cmd(list(self.actuation_data.q), list(self.actuation_data.dq), list(self.actuation_data.Kp), list(self.actuation_data.Kd), list(self.actuation_data.tau))
+            self.sensing_data.contact_state = self.hardware_robot.foot_force()
+            for i in range(0, self.num_contacts):
+                self.sensing_data.contact_state[i] = 1 if self.sensing_data.contact_state[i] >= self.FOOT_FORCE_THRES else 0
+        self.hardware_robot.set_crc()
+        self.hardware_robot.write()
+
+        # set sensing data
+        self.sensing_data.joint_pos = self.hardware_robot.q()
+        self.sensing_data.joint_vel = self.hardware_robot.dq()
+        self.sensing_data.joint_torque = self.hardware_robot.tau()
+        self.sensing_data.imu_acc = self.hardware_robot.imu_accel()
+        self.sensing_data.imu_ang_vel = self.hardware_robot.imu_ang_vel()
+        self.sensing_data.time_stamp = time.time() - self.t0
+        # self.sensing_data.time_stamp = 0
+        # print(vars(self.actuation_data))
+        # print(self.sensing_data.time_stamp)
+        # for plotting
+        self.imu_accels.append(self.sensing_data.imu_acc)
+        self.imu_ang_vels.append(self.sensing_data.imu_ang_vel)
+        self.contact_states.append(self.sensing_data.contact_state)
+
     def GetShoulderPosition(self, foot_idx: int) -> np.array:
         return self.shoulder_positions[foot_idx]
 

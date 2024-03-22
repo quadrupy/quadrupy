@@ -62,7 +62,6 @@ class WalkingSystem():
                 self.controller.AddToBuilderAndConnect(builder, robot=self.robot, target=self.target, observer=self.observer)
 
         self.diagram = builder.Build()
-
         return
     
     def RunSystem(self, t_end: float, target_rate=1.0, ignore_error=True):

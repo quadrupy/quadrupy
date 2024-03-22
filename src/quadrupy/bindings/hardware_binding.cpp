@@ -45,7 +45,7 @@ PYBIND11_MODULE(go2_py, m) {
     //     .def_property("kp", &MotorCmd_::kp, [](MotorCmd_& mc, float kp) {mc.kp() = kp;})
     //     .def_property("kd", &MotorCmd_::kd, [](MotorCmd_& mc, float kd) {mc.kd() = kd;});
     py::class_<ChannelFactory>(m, "ChannelFactory")
-        .def("InstanceInit", [](std::string interface){ChannelFactory::Instance()->Init(0, interface);});
+        .def("instance_init", [](std::string interface){ChannelFactory::Instance()->Init(0, interface);});
 
     // py::class_<RobotStateClient>(m, "RobotStateClient")
     //     .def(py::init<>())
@@ -60,5 +60,11 @@ PYBIND11_MODULE(go2_py, m) {
         .def("activate_service", &Go2::activateService)
         .def("set_motor_cmd", &Go2::set_motor_cmd)
         .def("set_crc", &Go2::set_crc)
-        .def("write", &Go2::write);
+        .def("write", &Go2::write)
+        .def("imu_accel", &Go2::imu_accel)
+        .def("imu_ang_vel", &Go2::imu_ang_vel)
+        .def("foot_force", &Go2::foot_force)
+        .def("q", &Go2::q)
+        .def("dq", &Go2::dq)
+        .def("tau", &Go2::tau);
 }

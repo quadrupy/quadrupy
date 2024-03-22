@@ -4,6 +4,7 @@ from pydrake.common.value import AbstractValue
 
 import numpy as np
 import pygame
+import time
 
 class WalkingTargetValue():
     def __init__(self) -> None:
@@ -47,7 +48,7 @@ class JoystickInput(WalkingTarget):
 
         pygame.init()
         if pygame.joystick.get_count() > 0:
-            self.js = pygame.joystick.Joystick(0)    
+            self.js = pygame.joystick.Joystick(0)
         else:    
             self.js = None
 
@@ -60,11 +61,11 @@ class JoystickInput(WalkingTarget):
                 self.target_value.start_stop_stepping = True
             else:
                 self.target_value.start_stop_stepping = False
-            if self.js.get_button(1):
+            if self.js.get_button(2):
                 self.target_value.kill = True
 
             des_x_y_vel_unfilt = np.multiply(self.settings.x_y_yaw_scale,np.array([self.js.get_axis(1),self.js.get_axis(0),self.js.get_axis(3)])) + self.settings.x_y_yaw_offset
             self.target_value.des_x_y_yaw_vel = self.settings.alpha_filt*self.target_value.des_x_y_yaw_vel + (1.-self.settings.alpha_filt)*des_x_y_vel_unfilt
-
+        # print(vars(self.target_value))
         output.set_value(self.target_value)
         return
