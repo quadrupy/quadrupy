@@ -11,6 +11,11 @@ import time
 import logging
 logger = logging.getLogger(__name__)
 
+from typing import Optional
+
+from websockets.sync.client import connect
+
+
 try:
     from quadrupy.bindings.lib import go2_py as go2
 except ImportError:
@@ -99,7 +104,9 @@ class WalkingRobot(LeafSystem):
                       dt:float = 1e-3,                                                   # Time step between control data updates
                       is_sim:bool = True,                                                # Flag to indicate whether this is a simulation or hardware
                       sim_initial_state:np.array = None,                                 # Initial state for the simulator. If None, use the default state from the URDF
-                      meshcat = None):                                                   # Meshcat object for visualization, if None, will create a new meshcat object
+                      meshcat = None,
+                      telemetry_url: Optional[str] = False
+                      ):                                                   # Meshcat object for visualization, if None, will create a new meshcat object
         LeafSystem.__init__(self)
         self.plant = reference_plant
         self.scene_graph = scene_graph
@@ -113,6 +120,12 @@ class WalkingRobot(LeafSystem):
         self.num_act = reference_plant.num_actuators()
         self.dt = dt
         self.is_sim = is_sim
+
+
+        self.telemetry_url = telemetry_url
+
+        # TODO(akoen): close on exit
+        self.ws = connect(telemetry_url, additional_headers={'Authorization': f'Bearer glsa_uVd2Na1zl6OhtTSW3Y6aVrEfUYHBODnD_5517eedd'}) if telemetry_url else None
         
         self.actuation_data = LLCActuationCommand(self.num_act)
         self.sensing_data = SensorData(reference_plant.num_actuators(),self.num_contacts)
@@ -175,6 +188,18 @@ class WalkingRobot(LeafSystem):
             self.meshcat_vis.ForcedPublish(self.vis_ctx)
         else:
             self.HardwareUpdate()
+
+        if self.telemetry_url:
+            influx_time = int(time.time() * 1_000_000_000)
+            # Format at https://docs.influxdata.com/influxdb/v2/reference/syntax/line-protocol/
+            # self.lt = time.time()
+            data = f"accel x={self.sensing_data.imu_acc[0]:.4f},y={self.sensing_data.imu_acc[1]:4f},z={self.sensing_data.imu_acc[2]:4f} {influx_time}"
+            self.ws.send(data)
+            # if not hasattr(self, "lt"):
+            #     self.lt = 0
+            # print(time.time()-self.lt)
+            # self.lt = time.time()
+
 
     def SimUpdate(self):
         # Send actuation commands to the simulator

@@ -2,11 +2,12 @@ from pydrake.systems.framework import DiagramBuilder
 from pydrake.systems.analysis import Simulator
 import matplotlib.pyplot as plt
 from pydrake.systems.drawing import plot_system_graphviz
+from typing import Optional
 
 import yaml
 
 class WalkingSystem():
-    def __init__(self, config_file: str, is_sim=True, use_cheater_observer=False):
+    def __init__(self, config_file: str, is_sim=True, use_cheater_observer=False, telemetry_url: Optional[str] = None):
         self.is_sim = is_sim
         with open(config_file) as file:
             config_dict = yaml.safe_load(file)
@@ -16,7 +17,7 @@ class WalkingSystem():
             robot_class = config_dict['robot']['class_name']
             if robot_class == 'Go2Robot':
                 from .robots.Go2Robot import Go2Robot
-                self.robot = Go2Robot(is_sim=is_sim, config_dict=config_dict['robot'])
+                self.robot = Go2Robot(is_sim=is_sim, config_dict=config_dict['robot'], telemetry_url=telemetry_url)
             else:
                 raise NotImplementedError(f'Robot class {robot_class} not implemented')
         if self.robot is None:
