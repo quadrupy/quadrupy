@@ -7,7 +7,15 @@ from pydrake.geometry import GeometryId, SceneGraph, Meshcat, MeshcatVisualizer,
 from pydrake.math import RotationMatrix
 import numpy as np
 import time
-from quadrupy.bindings.lib import go2_py as go2
+
+import logging
+logger = logging.getLogger(__name__)
+
+try:
+    from quadrupy.bindings.lib import go2_py as go2
+except ImportError:
+    logger.warning("Hardware bindings not found. Skipping...")
+    
 
 class LLCActuationCommand():
     # Low-level controller actuation command. This is the input to the low level controllers on the robot

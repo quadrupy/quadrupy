@@ -7,6 +7,7 @@ _deps/
 build/
 lib/
 venv/
+*.log
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
