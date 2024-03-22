@@ -214,6 +214,7 @@ class Go2Robot(WalkingRobot):
         else:
             self.hardware_robot.set_motor_cmd(list(self.actuation_data.q), list(self.actuation_data.dq), list(self.actuation_data.Kp), list(self.actuation_data.Kd), list(self.actuation_data.tau))
             self.sensing_data.contact_state = self.hardware_robot.foot_force()
+            self.sensing_data.ff = self.hardware_robot.foot_force()
             for i in range(0, self.num_contacts):
                 self.sensing_data.contact_state[i] = 1 if self.sensing_data.contact_state[i] >= self.FOOT_FORCE_THRES else 0
         self.hardware_robot.set_crc()

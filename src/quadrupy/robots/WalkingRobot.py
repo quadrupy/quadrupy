@@ -82,6 +82,7 @@ class SensorData():
         self.imu_acc = np.zeros(3)
         self.imu_ang_vel = np.zeros(3)
         self.contact_state = np.zeros(n_contacts)
+        self.ff = np.zeros(n_contacts) # raw foot force
         self.time_stamp = 0.0
 
     def copy_from(self, sensor_data_in: "SensorData"):
@@ -125,7 +126,8 @@ class WalkingRobot(LeafSystem):
         self.telemetry_url = telemetry_url
 
         # TODO(akoen): close on exit
-        self.ws = connect(telemetry_url, additional_headers={'Authorization': f'Bearer glsa_uVd2Na1zl6OhtTSW3Y6aVrEfUYHBODnD_5517eedd'}) if telemetry_url else None
+        bearer = "glsa_bfrRyolYrv7lutpNjKw1Xg3yuMAR2tcY_fa00e5e2"
+        self.ws = connect(telemetry_url, additional_headers={'Authorization': f'Bearer {bearer}'}) if telemetry_url else None
         
         self.actuation_data = LLCActuationCommand(self.num_act)
         self.sensing_data = SensorData(reference_plant.num_actuators(),self.num_contacts)
@@ -179,7 +181,7 @@ class WalkingRobot(LeafSystem):
                 self.plant.SetPositions(self.sim_plant_ctx,sim_initial_state)
         else:
             self.last_timestamp = 0
-            
+
     def PeriodicUpdate(self,context: Context, output: AbstractValue):
         # This function is responsible for sending motor commands to the simulator/robot and filling in the sensing data
         self.actuation_data.copy_from(self.llc_actuation_in.Eval(context))
@@ -192,13 +194,11 @@ class WalkingRobot(LeafSystem):
         if self.telemetry_url:
             influx_time = int(time.time() * 1_000_000_000)
             # Format at https://docs.influxdata.com/influxdb/v2/reference/syntax/line-protocol/
-            # self.lt = time.time()
-            data = f"accel x={self.sensing_data.imu_acc[0]:.4f},y={self.sensing_data.imu_acc[1]:4f},z={self.sensing_data.imu_acc[2]:4f} {influx_time}"
-            self.ws.send(data)
-            # if not hasattr(self, "lt"):
-            #     self.lt = 0
-            # print(time.time()-self.lt)
-            # self.lt = time.time()
+            data_acc = f"accel x={self.sensing_data.imu_acc[0]:.4f},y={self.sensing_data.imu_acc[1]:4f},z={self.sensing_data.imu_acc[2]:4f} {influx_time}"
+            self.ws.send(data_acc)
+            if not self.is_sim:
+                data_ff = f"ff FL={self.sensing_data.ff[0]:.4f},FR={self.sensing_data.ff[1]:4f},BL={self.sensing_data.ff[2]:4f},BR={self.sensing_data.ff[3]:4f} {influx_time}"
+                self.ws.send(data_ff)
 
 
     def SimUpdate(self):
