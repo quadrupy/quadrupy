@@ -6,3 +6,10 @@ services:
     restart: unless-stopped
     ports:
      - '3000:3000'
+    volumes:
+      - ./grafana/dashboard.yaml:/etc/grafana/provisioning/dashboards/main.yaml
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana-storage:/var/lib/grafana
+
+volumes:
+  grafana-storage:
