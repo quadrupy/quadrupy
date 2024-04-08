@@ -122,9 +122,6 @@ class WalkingRobot(LeafSystem):
         self.dt = dt
         self.is_sim = is_sim
 
-
-        # self.telemetry_url = telemetry_url
-
         # TODO(akoen): close on exit
         if (telemetry_url := os.getenv("GRAFANA_URL")) is None or (grafana_token := os.getenv("GRAFANA_SERVICE_ACCOUNT_TOKEN")) is None:
             logger.warning("Telemetry not configured. Skipping...")

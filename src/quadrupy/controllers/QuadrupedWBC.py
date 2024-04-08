@@ -123,7 +123,6 @@ class QuadrupedWBC(WalkingController):
         qv_world = self.state_in.Eval(context)
         target_in:WalkingTargetValue = self.target_in.Eval(context)
 
-        # print(np.max(np.abs(qv_world[7:self.nq])))
         # Convert robot state to body coordinates
         if np.linalg.norm(qv_world) < 1e-6:
             # If the quaternion is zero, the robot is not initialized. Return zero torques
