@@ -32,9 +32,14 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/akoen/unitree_sdk2
         GIT_TAG main
 )
-FetchContent_MakeAvailable(unitree_interface)
+
+if(NOT APPLE)
+        FetchContent_MakeAvailable(unitree_interface)
+        pybind11_add_module(go2_py hardware_binding.cpp)
+        target_link_libraries(go2_py PRIVATE unitree_interface)
+else()
+        message(WARNING "Not compiling hardware bindings on MacOS (unsupported)")
+endif()
 
 pybind11_add_module(inekf_py inekf_binding.cpp)
 target_link_libraries(inekf_py PRIVATE inekf)
-pybind11_add_module(go2_py hardware_binding.cpp)
-target_link_libraries(go2_py PRIVATE unitree_interface)

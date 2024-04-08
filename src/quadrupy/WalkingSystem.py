@@ -2,11 +2,15 @@ from pydrake.systems.framework import DiagramBuilder
 from pydrake.systems.analysis import Simulator
 import matplotlib.pyplot as plt
 from pydrake.systems.drawing import plot_system_graphviz
+from typing import Optional
+from dotenv import load_dotenv
 
 import yaml
 
 class WalkingSystem():
     def __init__(self, config_file: str, is_sim=True, use_cheater_observer=False):
+        load_dotenv()
+        
         self.is_sim = is_sim
         with open(config_file) as file:
             config_dict = yaml.safe_load(file)

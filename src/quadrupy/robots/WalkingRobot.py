@@ -7,7 +7,21 @@ from pydrake.geometry import GeometryId, SceneGraph, Meshcat, MeshcatVisualizer,
 from pydrake.math import RotationMatrix
 import numpy as np
 import time
-from quadrupy.bindings.lib import go2_py as go2
+import os
+
+import logging
+logger = logging.getLogger(__name__)
+
+from typing import Optional
+
+from websockets.sync.client import connect
+
+
+try:
+    from quadrupy.bindings.lib import go2_py as go2
+except ImportError:
+    logger.warning("Hardware bindings not found. Skipping...")
+    
 
 class LLCActuationCommand():
     # Low-level controller actuation command. This is the input to the low level controllers on the robot
@@ -69,6 +83,7 @@ class SensorData():
         self.imu_acc = np.zeros(3)
         self.imu_ang_vel = np.zeros(3)
         self.contact_state = np.zeros(n_contacts)
+        self.ff = np.zeros(n_contacts) # raw foot force
         self.time_stamp = 0.0
 
     def copy_from(self, sensor_data_in: "SensorData"):
@@ -91,7 +106,8 @@ class WalkingRobot(LeafSystem):
                       dt:float = 1e-3,                                                   # Time step between control data updates
                       is_sim:bool = True,                                                # Flag to indicate whether this is a simulation or hardware
                       sim_initial_state:np.array = None,                                 # Initial state for the simulator. If None, use the default state from the URDF
-                      meshcat = None):                                                   # Meshcat object for visualization, if None, will create a new meshcat object
+                      meshcat = None,
+                      ):                                                   # Meshcat object for visualization, if None, will create a new meshcat object
         LeafSystem.__init__(self)
         self.plant = reference_plant
         self.scene_graph = scene_graph
@@ -105,6 +121,13 @@ class WalkingRobot(LeafSystem):
         self.num_act = reference_plant.num_actuators()
         self.dt = dt
         self.is_sim = is_sim
+
+        # TODO(akoen): close on exit
+        if (telemetry_url := os.getenv("GRAFANA_URL")) is None or (grafana_token := os.getenv("GRAFANA_SERVICE_ACCOUNT_TOKEN")) is None:
+            logger.warning("Telemetry not configured. Skipping...")
+            self.ws = None
+        else:
+            self.ws = connect(f"ws://{telemetry_url}/api/live/push/go2", additional_headers={'Authorization': f"Bearer {grafana_token}"})
         
         self.actuation_data = LLCActuationCommand(self.num_act)
         self.sensing_data = SensorData(reference_plant.num_actuators(),self.num_contacts)
@@ -158,7 +181,7 @@ class WalkingRobot(LeafSystem):
                 self.plant.SetPositions(self.sim_plant_ctx,sim_initial_state)
         else:
             self.last_timestamp = 0
-            
+
     def PeriodicUpdate(self,context: Context, output: AbstractValue):
         # This function is responsible for sending motor commands to the simulator/robot and filling in the sensing data
         self.actuation_data.copy_from(self.llc_actuation_in.Eval(context))
@@ -167,6 +190,16 @@ class WalkingRobot(LeafSystem):
             self.meshcat_vis.ForcedPublish(self.vis_ctx)
         else:
             self.HardwareUpdate()
+
+        if self.ws:
+            influx_time = int(time.time() * 1_000_000_000)
+            # Format at https://docs.influxdata.com/influxdb/v2/reference/syntax/line-protocol/
+            data_acc = f"accel x={self.sensing_data.imu_acc[0]:.4f},y={self.sensing_data.imu_acc[1]:4f},z={self.sensing_data.imu_acc[2]:4f} {influx_time}"
+            self.ws.send(data_acc)
+            if not self.is_sim:
+                data_ff = f"ff FL={self.sensing_data.ff[0]:.4f},FR={self.sensing_data.ff[1]:4f},BL={self.sensing_data.ff[2]:4f},BR={self.sensing_data.ff[3]:4f} {influx_time}"
+                self.ws.send(data_ff)
+
 
     def SimUpdate(self):
         # Send actuation commands to the simulator

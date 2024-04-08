@@ -6,6 +6,14 @@ Recommend using a venv with python 3.11. Run:
 pip install -e .
 ```
 
+Set up live telemetry with Grafana, replacing `GRAFANA_SERVICE_ACCOUNT_TOKEN` with an admin service account API token:
+```
+cat <<EOT >> .env
+GRAFANA_URL="localhost:3000"
+GRAFANA_SERVICE_ACCOUNT_TOKEN="glsa_uVd2Na1zl6OhtTSW3Y6aVrEfUYHBODnD_5517eedd"
+EOT
+```
+
 To compile the bindings for the third party C++ libraries:
 ```
 make bindings
