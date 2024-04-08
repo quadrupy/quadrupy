@@ -7,6 +7,7 @@ from pydrake.geometry import GeometryId, SceneGraph, Meshcat, MeshcatVisualizer,
 from pydrake.math import RotationMatrix
 import numpy as np
 import time
+import os
 
 import logging
 logger = logging.getLogger(__name__)
@@ -106,7 +107,6 @@ class WalkingRobot(LeafSystem):
                       is_sim:bool = True,                                                # Flag to indicate whether this is a simulation or hardware
                       sim_initial_state:np.array = None,                                 # Initial state for the simulator. If None, use the default state from the URDF
                       meshcat = None,
-                      telemetry_url: Optional[str] = False
                       ):                                                   # Meshcat object for visualization, if None, will create a new meshcat object
         LeafSystem.__init__(self)
         self.plant = reference_plant
@@ -123,11 +123,14 @@ class WalkingRobot(LeafSystem):
         self.is_sim = is_sim
 
 
-        self.telemetry_url = telemetry_url
+        # self.telemetry_url = telemetry_url
 
         # TODO(akoen): close on exit
-        bearer = "glsa_bfrRyolYrv7lutpNjKw1Xg3yuMAR2tcY_fa00e5e2"
-        self.ws = connect(telemetry_url, additional_headers={'Authorization': f'Bearer {bearer}'}) if telemetry_url else None
+        if (telemetry_url := os.getenv("GRAFANA_URL")) is None or (grafana_token := os.getenv("GRAFANA_SERVICE_ACCOUNT_TOKEN")) is None:
+            logger.warning("Telemetry not configured. Skipping...")
+            self.ws = None
+        else:
+            self.ws = connect(f"ws://{telemetry_url}/api/live/push/go2", additional_headers={'Authorization': f"Bearer {grafana_token}"})
         
         self.actuation_data = LLCActuationCommand(self.num_act)
         self.sensing_data = SensorData(reference_plant.num_actuators(),self.num_contacts)
@@ -191,7 +194,7 @@ class WalkingRobot(LeafSystem):
         else:
             self.HardwareUpdate()
 
-        if self.telemetry_url:
+        if self.ws:
             influx_time = int(time.time() * 1_000_000_000)
             # Format at https://docs.influxdata.com/influxdb/v2/reference/syntax/line-protocol/
             data_acc = f"accel x={self.sensing_data.imu_acc[0]:.4f},y={self.sensing_data.imu_acc[1]:4f},z={self.sensing_data.imu_acc[2]:4f} {influx_time}"

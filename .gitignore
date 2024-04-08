@@ -4,10 +4,11 @@ _deps/
 .direnv/
 .envrc
 .DS_Store
-build/
+# build/
 lib/
 venv/
 *.log
+.env
 
 ### Python ###
 # Byte-compiled / optimized / DLL files

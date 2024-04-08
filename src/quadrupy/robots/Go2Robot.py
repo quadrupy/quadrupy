@@ -27,7 +27,7 @@ class Go2RobotSettings():
             self.controller_dt = config_dict['controller_dt']
 
 class Go2Robot(WalkingRobot):
-    def __init__(self, is_sim=True, settings: Go2RobotSettings = None, config_dict: dict = None, telemetry_url: Optional[str] = False):
+    def __init__(self, is_sim=True, settings: Go2RobotSettings = None, config_dict: dict = None):
         self.is_sim = is_sim
 
         self.settings = settings
@@ -77,7 +77,7 @@ class Go2Robot(WalkingRobot):
                     (plant.GetFrameByName("FR_foot"),np.zeros([1,3]),plant.GetCollisionGeometriesForBody(plant.GetBodyByName("FR_foot"))),
                     (plant.GetFrameByName("RL_foot"),np.zeros([1,3]),plant.GetCollisionGeometriesForBody(plant.GetBodyByName("RL_foot"))),
                     (plant.GetFrameByName("RR_foot"),np.zeros([1,3]),plant.GetCollisionGeometriesForBody(plant.GetBodyByName("RR_foot")))]
-        WalkingRobot.__init__(self,builder,plant,scene_graph,imu_body,root_body,contacts,actuation_limits,dt=self.settings.controller_dt,is_sim=is_sim,telemetry_url=telemetry_url)
+        WalkingRobot.__init__(self,builder,plant,scene_graph,imu_body,root_body,contacts,actuation_limits,dt=self.settings.controller_dt,is_sim=is_sim)
         
         # Useful variables for IK
         self.foot_names = ['FL','FR','RL','RR']
