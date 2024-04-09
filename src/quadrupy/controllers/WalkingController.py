@@ -31,6 +31,7 @@ class WalkingController(LeafSystem):
             builder.Connect(robot.cheater_state_out,self.state_in)
         else:
             builder.Connect(observer.state_out,self.state_in)
+        builder.Connect(observer.state_out,robot.state_in)
         if target is None:  
             target = WalkingTarget()
             builder.AddSystem(target)

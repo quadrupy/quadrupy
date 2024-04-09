@@ -206,7 +206,7 @@ class Go2Robot(WalkingRobot):
         # target_pos[1] /= 2
         # target_pos[2] /= 2 
         t = time.time()
-        if t-self.t0 < 10:
+        if t-self.t0 < 15:
             kp = min(60, 6*(t-self.t0))
             self.hardware_robot.set_motor_cmd(list(target_pos), [0]*12, [kp]*12, [5]*12, [0]*12)
             self.sensing_data.contact_state = [1]*4

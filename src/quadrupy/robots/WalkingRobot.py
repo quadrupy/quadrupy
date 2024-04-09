@@ -140,6 +140,7 @@ class WalkingRobot(LeafSystem):
         self.sensing_out = self.DeclareAbstractOutputPort('sensing_out',lambda: AbstractValue.Make(SensorData(self.num_act,self.num_contacts)),self.CalcSensing,prerequisites_of_calc=nodep)
         self.cheater_state_out = self.DeclareVectorOutputPort('cheater_state_out',reference_plant.num_multibody_states(),self.CalcCheaterState,prerequisites_of_calc=nodep)
         self.selection_matrix = self.plant.MakeActuationMatrix() # Selection matrix (nvxnu) maps from actuators to joints
+        self.state_in = self.DeclareVectorInputPort('state_in',self.plant.num_multibody_states())
 
         # Create an internal diagram for the plant and scene graph
         # In simulation, this will be what we use to simulate our physics
@@ -155,9 +156,15 @@ class WalkingRobot(LeafSystem):
             builder.AddSystem(self.sim_llc)
             builder.Connect(reference_plant.get_state_output_port(), self.sim_llc.state_in)
             builder.Connect(self.sim_llc.torque_out, reference_plant.get_actuation_input_port())
+        
         else:
             # initialize hardware robot
-            go2.ChannelFactory.instance_init("eno2") # network interface
+            print(os.getenv("NETWORK_ADAPTER"))
+            if not (network_interface := os.getenv("NETWORK_ADAPTER")):
+                logger.warning("Go2 network interface not configured...")
+            else:
+                go2.ChannelFactory.instance_init(network_interface) # network interface
+
             self.hardware_robot = go2.Go2()
             self.hardware_robot.init_robot_state_client()
             while (self.hardware_robot.query_service_status("sport_mode")):
@@ -192,13 +199,20 @@ class WalkingRobot(LeafSystem):
             self.HardwareUpdate()
 
         if self.ws:
+            
+            input_state = self.state_in.Eval(context)
+            
             influx_time = int(time.time() * 1_000_000_000)
             # Format at https://docs.influxdata.com/influxdb/v2/reference/syntax/line-protocol/
-            data_acc = f"accel x={self.sensing_data.imu_acc[0]:.4f},y={self.sensing_data.imu_acc[1]:4f},z={self.sensing_data.imu_acc[2]:4f} {influx_time}"
-            self.ws.send(data_acc)
-            if not self.is_sim:
-                data_ff = f"ff FL={self.sensing_data.ff[0]:.4f},FR={self.sensing_data.ff[1]:4f},BL={self.sensing_data.ff[2]:4f},BR={self.sensing_data.ff[3]:4f} {influx_time}"
-                self.ws.send(data_ff)
+
+
+            self.ws.send(f"position x={input_state[4]},y={input_state[5]},z={input_state[6]} {influx_time}")
+            # self.ws.send(f"vel x={input_state[10]},y={input_state[11]},z={input_state[12]} {influx_time}")
+            # self.ws.send(f"angle w={input_state[0]},x={input_state[1]},y={input_state[2]},z={input_state[3]} {influx_time}")
+            # self.ws.send(f"accel x={self.sensing_data.imu_acc[0]:.4f},y={self.sensing_data.imu_acc[1]:4f},z={self.sensing_data.imu_acc[2]:4f} {influx_time}")
+
+            # if not self.is_sim:
+                # self.ws.send(f"ff FL={self.sensing_data.ff[0]:.4f},FR={self.sensing_data.ff[1]:4f},BL={self.sensing_data.ff[2]:4f},BR={self.sensing_data.ff[3]:4f} {influx_time}")
 
 
     def SimUpdate(self):

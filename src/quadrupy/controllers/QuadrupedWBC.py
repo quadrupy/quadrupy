@@ -130,6 +130,9 @@ class QuadrupedWBC(WalkingController):
         robot_rot = RollPitchYaw(Quaternion(qv_world[:4]))
         # Pull out target values
         if abs(robot_rot.roll_angle())>np.pi/4 or abs(robot_rot.pitch_angle())>np.pi/4 or np.any(np.abs(qv_world[7:self.nq])>3) or target_in.kill:
+            print(abs(robot_rot.roll_angle())>np.pi/4)
+            print(abs(robot_rot.pitch_angle())>np.pi/4)
+            print(np.any(np.abs(qv_world[7:self.nq])>3))
             raise RuntimeError('Controller killed')
         des_xy_vel = target_in.des_x_y_yaw_vel[:2]
         des_yaw_vel = target_in.des_x_y_yaw_vel[2]

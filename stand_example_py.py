@@ -1,7 +1,7 @@
 from bindings.lib import go2_py as go2
 import time
 def main():
-    go2.ChannelFactory.InstanceInit("eno2")
+    go2.ChannelFactory.InstanceInit("enxd8eb97b7f0da")
     custom = go2.Custom();
     custom.init_robot_state_client()
     while (custom.query_service_status("sport_mode")):
