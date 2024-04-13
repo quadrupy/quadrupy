@@ -139,6 +139,7 @@ class WalkingRobot(LeafSystem):
         self.llc_actuation_in = self.DeclareAbstractInputPort('llc_actuation_in',AbstractValue.Make(LLCActuationCommand(self.num_act)))
         self.sensing_out = self.DeclareAbstractOutputPort('sensing_out',lambda: AbstractValue.Make(SensorData(self.num_act,self.num_contacts)),self.CalcSensing,prerequisites_of_calc=nodep)
         self.cheater_state_out = self.DeclareVectorOutputPort('cheater_state_out',reference_plant.num_multibody_states(),self.CalcCheaterState,prerequisites_of_calc=nodep)
+        self.state_in = self.DeclareVectorInputPort('state_in', )
         self.selection_matrix = self.plant.MakeActuationMatrix() # Selection matrix (nvxnu) maps from actuators to joints
         self.state_in = self.DeclareVectorInputPort('state_in',self.plant.num_multibody_states())
 
