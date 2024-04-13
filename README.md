@@ -1,4 +1,8 @@
-# Quadrupy
+<p align="center"> 
+  <img width="300" src="https://github.com/quadrupy/quadrupy/assets/43913902/7cb6a98e-c395-4e9b-a63d-dbc4c1aaddde" />
+</p>
+<h3 align="center">Quadrupy: A Quadrupedal Development Platform</h3>
+
 
 ## Install
 Recommend using a venv with python 3.11. Run:
